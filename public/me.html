@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Profile</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+      .wrap { max-width: 720px; margin: 0 auto; }
+      a { color: #0366d6; text-decoration: none; }
+      ol { padding-left: 1.25rem; }
+      .nav { max-width: 720px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .nav a { color: #0366d6; text-decoration: none; }
+      .nav a.active { font-weight: 600; }
+      .nav .links { display: flex; gap: .75rem; }
+      .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+      .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+      .nick { margin-top: 1rem; }
+      .nick input { width: 100%; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
+      .nick .row { margin-top: .5rem; display: flex; gap: .5rem; }
+      .hidden { display: none !important; }
+      .row .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-top-color: #0366d6;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body data-page-name="profile">
+    <div class="nav">
+      <div class="links">
+        <a href="/">Home</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/rules">Rules</a>
+      </div>
+      <div class="wallet">
+        <span id="addr" style="opacity:.8"></span>
+        <button id="connectBtn" class="btn">Connect wallet</button>
+      </div>
+    </div>
+    <div class="wrap">
+      <h1>Profile</h1>
+      <div id="loginContainer" class="hidden">
+        <div id="nicks" class="nick">
+            <label for="nick" style="display:block; margin-bottom:.5rem;">You can set a nickname:</label>
+            <input type="text" id="nick" placeholder="Type your nickname..." maxlength="30"/>
+            <div class="row">
+                <button id="clearNick" class="btn" type="button">Clear</button>
+                <button id="submitNick" class="btn" type="button">Submit nick</button>
+                <div id="nickProgress" class="spinner hidden" aria-label="Loading"></div>
+            </div>
+        </div>
+        <div id="games" />
+      </div>
+    </div>
+    <script type="module" src="/wallet.js"></script>
+    <script>(function(){
+        const area = document.getElementById('nick');
+        const clearBtn = document.getElementById('clearNick');
+        const submitBtn = document.getElementById('submitNick');
+        if (clearBtn) clearBtn.addEventListener('click', () => { if (area) area.value=''; });
+        if (submitBtn) submitBtn.addEventListener('click', async () => {
+          try {
+            if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+            const value = (area && area.value || '').trim();
+            if (!value) { alert('Please enter a nick'); return; }
+            WalletUI.setNickname(value);
+          } catch(e) { alert(e.message); }
+        });
+      })();</script>
+  </body>
+</html>

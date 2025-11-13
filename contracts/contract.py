@@ -1,0 +1,354 @@
+# v0.1.0
+# { "Depends": "py-genlayer:latest" }
+from genlayer import *
+from dataclasses import dataclass
+
+import json
+import typing
+import time
+
+@allow_storage
+@dataclass
+class Participation:
+    creator: bool
+    game_time: float
+
+    def to_dict(self, game_id: str):
+        return {"id": game_id, "creator": str(self.creator), "game_time": str(self.game_time)}
+
+@allow_storage
+@dataclass
+class Score:
+    score: float
+    speed: float
+    answer: str
+
+    def to_dict(self, address: str, nick: str):
+        return {"score": str(int(self.score)), "speed": str(self.speed), "answer": str(self.answer), "nick": nick, "address": address}
+
+@allow_storage
+@dataclass
+class Game:
+    game_id: str
+    game_creator: Address
+    game_time: float
+    game_duration: float
+    game_image_link: str
+    game_image_desc: str
+    game_players: TreeMap[Address, Score]
+
+    def to_dict_list(self, time_left: str):
+        return {"id": self.game_id, "creator": str(self.game_creator.as_hex), "time_left": time_left}
+
+    def to_dict_active(self, answered: bool, time_left: str):
+        return {"id": self.game_id, "creator": str(self.game_creator.as_hex), "time_left": time_left, "image": self.game_image_link, "answered": str(answered) }
+
+    def to_dict_completed(self, nicks: TreeMap[Address, str]):
+        return {
+            "id": self.game_id, 
+            "creator": str(self.game_creator.as_hex), 
+            "image": self.game_image_link, 
+            "desc": self.game_image_desc, 
+            "players": _parse_players(self.game_players, nicks)
+        }
+
+
+class GuessPicture(gl.Contract):
+    games_all: TreeMap[str, Game]
+    points: TreeMap[Address, u256]
+    nicknames: TreeMap[Address, str]
+    game_index: TreeMap[Address, TreeMap[str, Participation]]
+    game_duration: float
+    game_coeff: float
+    error: str
+    owner: Address
+
+    def __init__(self):
+        self.game_duration = 10
+        self.game_coeff = 50
+        self.error = "None"
+        self.owner = gl.message.sender_address
+
+    @gl.public.write
+    def create_game(self, game_id: str, image_link: str) -> None:
+        self.create_game_duration(game_id, image_link, int(self.game_duration))
+
+    @gl.public.write
+    def create_game_duration(self, game_id: str, image_link: str, duration: int) -> None:
+        sender_address = gl.message.sender_address
+        if game_id in self.games_all:
+            raise Exception("Game already created")
+        def non_det():
+            try:
+                web_data = gl.nondet.web.render(image_link, mode = "screenshot")
+                png_bytes = getattr(web_data, "raw", web_data)  # fallback if it's already bytes
+                prompt = """
+Analyze and describe the following image and return the name of the main object on it.
+Return a JSON with the name as follows
+{{
+    "object": str, // the name of the main object in the image
+}}
+It is mandatory that you respond only using the JSON format above,
+nothing else. Don't include any other words or characters,
+your output must be only JSON without any formatting prefix or suffix.
+This result should be perfectly parsable by a JSON parser without errors.
+                """
+                result = gl.nondet.exec_prompt(prompt, images=[web_data])
+                print("result",result)
+                return json.loads(_extract_json_from_string(result))
+            except Exception as e:
+                return "error: " + str(e)
+        result_json = gl.eq_principle.strict_eq(non_det)
+        try:
+            t = time.time()
+            game = Game(
+                game_id=game_id,
+                game_creator=sender_address,
+                game_time=t,
+                game_duration=float(duration),
+                game_image_link=image_link,
+                game_image_desc=result_json["object"],
+                game_players=TreeMap()
+            )
+            self.games_all[game_id] = game
+            self.error = result_json["object"]
+            self.game_index.get_or_insert_default(sender_address)[game_id] = Participation(
+                creator=True,
+                game_time=t
+            )
+        except Exception as e:
+            self.error = "error create: " + str(e)
+
+    @gl.public.write
+    def join_game(self, game_id: str, answer: str) -> None:
+        game = self.games_all.get(game_id)
+        sender_address = gl.message.sender_address
+        if game is None:
+            raise Exception("Game not found")
+        if game.game_creator == sender_address:
+            raise Exception("Creator cannot play")
+        if _check_time_due(game):
+            raise Exception("Time is off")
+        if sender_address in game.game_players:
+            raise Exception("You have already played")
+
+        speed_ratio = _check_speed_ratio(game)
+        first = game.game_image_desc
+        task = f"""
+Compare the following two texts: {first} and {answer}.
+Estimate how similar they are in intended object/name and distinctive meaning.
+Normalization (apply to both texts before comparison):
+Lowercase, trim, collapse whitespace.
+Remove punctuation except within numbers/dates.
+Standardize dates to YYYY-MM-DD.
+Convert number words to digits when unambiguous.
+Cross-lingual normalization: translate tokens to a shared pivot language (English) when dictionary-stable (e.g., “кролик” → “rabbit”, “цвет” → “color”). Use conservative, high-confidence dictionary mappings only.
+Transliteration fallback: when exact translation is uncertain, apply language-appropriate transliteration to compare forms (e.g., “раббит” ≈ “rabbit”, “крол” ≈ “krol”). Treat transliteration similarity as weaker than translation.
+Near-lexeme/abbreviation handling: if a token is a plausible truncation/abbreviation/lemma of another (e.g., “rab” vs “rabbit”), count as a weak match only if no conflicting full-form exists and context supports the same entity/type. Otherwise, treat as mismatch.
+Do not infer missing data beyond the above conservative mappings.
+Identify explicitly present elements:
+Core subject/object (the intended entity or name).
+Key attributes/features (type, properties, qualifiers).
+Actions/behaviors/events (verbs, relations), if relevant.
+Concrete details/examples (numbers, named items, locations), if relevant.
+Scoring (strict 0–4 scale):
+4: Exact match of the intended object’s name in any language, or an exact synonym. Examples:“rabbit” vs “кролик” (rabbit).
+“building” vs “edifice”.
+“accordion” vs “аккордеон”.
+3: Minor syntactic/morphological error in an otherwise correct answer (e.g., misspelling, inflectional variant), or a subspecies/subtype, or an inexact but closely similar synonym sharing most defining features. Examples:“rabitt” vs “rabbit”.
+“bunny” vs “rabbit”.
+“hare” vs “rabbit”.
+“заяц” vs “rabbit”.
+“structure” vs “building”.
+“bayan” vs “accordion”.
+2: The answer names a distinctive key feature without correctly naming the object. Examples:“long-eared” vs “hare”.
+“very tall” vs “skyscraper”.
+“fast projectile” vs “rocket”.
+1: The answer matches only the broad category/group. Examples:“animal” vs “hare”.
+“musical instrument” vs “piano”.
+“building” vs “skyscraper”.
+0: Anything else. No reliable overlap with the intended object; wrong entity; vague/irrelevant; or cross-lingual/near-lexeme equivalence cannot be established with reasonable confidence.
+Conservative matching rules:
+Credit only what is explicitly present in both texts after normalization.
+Cross-lingual equivalence requires dictionary-stable or widely accepted mapping.
+Transliteration/abbreviation matches can justify score 3 when strongly suggestive; if confidence is low or conflicting, assign 0.
+No-idea fallback:
+If you cannot establish at least the category or a distinctive feature with reasonable confidence, assign 0.
+Output format (strict):
+Output only a JSON object with a single key "score".
+"score" must be an integer string in {"0","1","2","3","4"}.
+Do not output anything else.
+
+Return a JSON with the name as follows
+{{
+    "score": str, // the similarity score
+}}
+It is mandatory that you respond only using the JSON format above,
+nothing else. Don't include any other words or characters,
+your output must be only JSON without any formatting prefix or suffix.
+This result should be perfectly parsable by a JSON parser without errors.
+            """
+        def non_det():
+            try:
+                result = gl.nondet.exec_prompt(task)
+                print("result",result)
+                return json.loads(_extract_json_from_string(result))
+            except Exception as e:
+                return "error: " + str(e)
+        result_json = gl.eq_principle.strict_eq(non_det)
+        try:
+            score_str = result_json["score"]
+            score_num = float(score_str) * self.game_coeff * speed_ratio
+            game.game_players[sender_address] = Score(
+                score=score_num, 
+                speed=speed_ratio, 
+                answer=answer
+            )
+            if sender_address not in self.points:
+                self.points[sender_address] = 0
+            self.points[sender_address] += int(score_num)
+            self.error = str(score_num)
+            self.game_index.get_or_insert_default(sender_address)[game_id] = Participation(
+                creator=False,
+                game_time=game.game_time
+            )
+        except Exception as e:
+            self.error = "error answer: " + str(e)    
+
+    @gl.public.write
+    def set_game_duration(self, duration: int) -> None:
+        if self.owner != gl.message.sender_address:
+            raise Exception("You are not the owner")
+        self.game_duration = duration
+
+    @gl.public.write
+    def set_game_coeff(self, coeff: int) -> None:
+        if self.owner != gl.message.sender_address:
+            raise Exception("You are not the owner")
+        self.game_coeff = coeff
+
+    @gl.public.write
+    def set_nickname(self, nick: str) -> None:
+        self.nicknames[gl.message.sender_address] = truncate(nick, 25)
+
+    @gl.public.view
+    def get_error(self) -> str:
+        return self.error
+
+    @gl.public.view
+    def get_game_duration(self) -> int:
+        return int(self.game_duration)
+
+    @gl.public.view
+    def get_game_coeff(self) -> int:
+        return int(self.game_coeff)
+
+    @gl.public.view
+    def get_nickname(self) -> str:
+        try:
+            nick = self.nicknames.get(gl.message.sender_address)
+            if nick is None:
+                return "Nick not set"
+            return nick
+        except Exception as e:
+            return "error: " + str(e)
+
+    @gl.public.view
+    def get_my_games(self) -> str:
+        games = self.game_index.get(gl.message.sender_address)
+        try:
+            result = [] 
+            for game_id, part in games.items():
+                result.append(part.to_dict(game_id))
+            return json.dumps(result)
+        except Exception as e:
+            return json.dumps({ "error": str(e) })
+
+    @gl.public.view
+    def get_games(self, only_active: bool) -> str:
+        try:
+            result = [] 
+            for game_id, game in self.games_all.items():
+                g = _get_simple_game(game)
+                if not only_active or g["time_left"] != "0":
+                    result.append(g)
+            return json.dumps(result)
+        except Exception as e:
+            return json.dumps({ "error": str(e) })
+
+    @gl.public.view
+    def get_game(self, game_id: str) -> str:
+        game = self.games_all.get(game_id)
+        try:
+            if game is None:
+                return json.dumps({ "error": "Game not found" })
+            return json.dumps(_select_game(game, self.nicknames, gl.message.sender_address))
+        except Exception as e:
+            return json.dumps({ "error": str(e) })
+
+    @gl.public.view
+    def get_points(self) -> str:
+        result = []
+        for k, v in self.points.items():
+            result.append({ "wallet": k.as_hex, "nick": _safe_get_nick(k, self.nicknames), "points": str(v) })
+        return json.dumps(result)
+
+    @gl.public.view
+    def get_player_points(self, player_address: str) -> str:
+        result = self.points.get(Address(player_address), 0)
+        return json.dumps({ "wallet": player_address, "nick": _safe_get_nick(Address(player_address), self.nicknames), "points": str(result) })
+
+    @gl.public.view
+    def get_my_points(self) -> str:
+        return self.get_player_points(gl.message.sender_address.as_hex)
+
+def _safe_get_nick(address: Address, nicks: TreeMap[Address, str]) -> str:
+    nick = nicks.get(address)
+    if nick is None:
+        return ""
+    return nick
+
+def _parse_players(players: TreeMap[Address, Score], nicks: TreeMap[Address, str]) -> dict:
+    result = []
+    for address, score in players.items():
+        result.append(score.to_dict(str(address.as_hex), _safe_get_nick(address, nicks)))
+    return result   
+
+def _select_game(game: Game, nicks: TreeMap[Address, str], sender_address: Address) -> dict:
+    if _check_time_due(game):
+        return game.to_dict_completed(nicks)
+    return game.to_dict_active(
+        sender_address in game.game_players,
+        str(game.game_time + (game.game_duration * 60) - time.time())
+    )
+
+def _get_simple_game(game: Game) -> dict:
+    if _check_time_due(game):
+        return game.to_dict_list("0")
+    return game.to_dict_list(str(game.game_time + (game.game_duration * 60) - time.time()))
+
+def _check_time_due(game: Game) -> bool:
+    return time.time() - game.game_time >= game.game_duration * 60
+
+def _check_speed_ratio(game: Game) -> float:
+    return 1.0 - (time.time() - game.game_time) / (game.game_duration * 60)
+
+def truncate(s: str, N: int) -> str:
+    return s if len(s) <= N else s[:N] + "..."
+
+def _extract_json_from_string(s: str) -> str:
+    """
+    Extract a JSON object from a string.
+
+    Args:
+        s (str): The string potentially containing a JSON object.
+
+    Returns:
+        str: The extracted JSON string, or an empty string if no valid JSON is found.
+    """
+    start_index = s.find("{")
+    end_index = s.rfind("}")
+    if start_index != -1 and end_index != -1 and start_index < end_index:
+        return s[start_index : end_index + 1]
+    else:
+        return ""
