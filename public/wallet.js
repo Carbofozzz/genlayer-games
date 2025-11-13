@@ -7,6 +7,7 @@ const WalletUI = (() => {
   let client = null;
   let inited = false;
   let contract = '0x9EE51F9651AdA079abCC366F13a42E35444e446D';
+  let baseUrl = 'https://guess-picture.onrender.com';
 
   function maskAddress(a){ if(!a) return ''; return a.slice(0,5)+'…'+a.slice(-4); }
 
@@ -181,6 +182,40 @@ const WalletUI = (() => {
       getGame(document.body.dataset.gameId);
     } catch (error) {
       console.error('Error setting answer:', error);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+    }
+  }
+
+  async function game(gameUrl, id, picture) {
+    if (!client) return;
+    const clearBtn = document.getElementById('clearBtn');
+    const submitBtn = document.getElementById('saveBtn');
+    const progress = document.getElementById('saveProgress');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (submitBtn) submitBtn.classList.add('hidden');
+    if (progress) progress.classList.remove('hidden');
+    try {
+      const txHash = await client.writeContract({
+        address: contract,
+        functionName: "create_game",
+        args: [id, baseUrl + picture],
+      });
+      console.error('Success tx game:', txHash);
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 100,
+        interval: 2000,
+      });
+      console.error('Success setting game:', receipt);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      window.location.href = gameUrl || `/game/${id}`;
+    } catch (error) {
+      console.error('Error setting game:', error);
       if (clearBtn) clearBtn.classList.remove('hidden');
       if (submitBtn) submitBtn.classList.remove('hidden');
       if (progress) progress.classList.add('hidden');
@@ -557,7 +592,7 @@ const WalletUI = (() => {
     }
   }
 
-  return { connectWalletAndEnsureNetwork, connect, disconnect, init, isConnected, getAddress, ensureConnected, requireConnectedOnLoad, setNickname, answer };
+  return { connectWalletAndEnsureNetwork, connect, disconnect, init, isConnected, getAddress, ensureConnected, requireConnectedOnLoad, setNickname, answer, game };
 })();
 
 if (typeof window !== 'undefined') {
