@@ -318,8 +318,10 @@ const WalletUI = (() => {
           padTheme.classList.remove('hidden');
           img.classList.add('hidden');
           if (game.time_left) {
+            console.log('Match game active ' + game.answered);
             if (game.answered == "True") {
               pad.classList.add('hidden');
+              console.log('Match game active hidden pad');
             } else {
               pad.classList.remove('hidden');
               window.resizeCanvas();
@@ -467,6 +469,7 @@ const WalletUI = (() => {
           answerEl.src = item.answer;
           answerEl.width = 200; 
           answerEl.height = 150;
+          nickEl.style.marginTop = '.5rem';
           left.appendChild(answerEl);
         }
       }
