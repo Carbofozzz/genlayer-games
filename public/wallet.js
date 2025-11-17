@@ -464,10 +464,10 @@ const WalletUI = (() => {
           left.appendChild(answerEl);
         } else {
           const answerEl = document.createElement('img');
-          answerEl.src = 'path/to/image.jpg';
+          answerEl.src = item.answer;
           answerEl.width = 200; 
           answerEl.height = 150;
-          container.appendChild(answerEl);
+          left.appendChild(answerEl);
         }
       }
       
