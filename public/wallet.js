@@ -318,8 +318,12 @@ const WalletUI = (() => {
           padTheme.classList.remove('hidden');
           img.classList.add('hidden');
           if (game.time_left) {
-            pad.classList.remove('hidden');
-            window.resizeCanvas();
+            if (game.answered == "True") {
+              pad.classList.add('hidden');
+            } else {
+              pad.classList.remove('hidden');
+              window.resizeCanvas();
+            }
           } else {
             pad.classList.add('hidden');
           }
