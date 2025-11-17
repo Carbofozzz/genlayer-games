@@ -6,10 +6,10 @@
     <title>Rules</title>
     <style>
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
-      .wrap { max-width: 720px; margin: 0 auto; }
+      .wrap { max-width: 800px; margin: 0 auto; }
       a { color: #0366d6; text-decoration: none; }
       ol { padding-left: 1.25rem; }
-      .nav { max-width: 720px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
       .nav a { color: #0366d6; text-decoration: none; }
       .nav a.active { font-weight: 600; }
       .nav .links { display: flex; gap: .75rem; }
@@ -20,7 +20,8 @@
   <body>
     <div class="nav">
       <div class="links">
-        <a href="/">Home</a>
+        <a href="/">GuessPicture</a>
+        <a href="/draw-match">DrawMatch</a>
         <a href="/leaderboard">Leaderboard</a>
         <a href="/rules" class="active">Rules</a>
       </div>
@@ -31,10 +32,17 @@
     </div>
     <div class="wrap">
       <h1>Rules</h1>
+      <h3>GuessPicture</h3>
       <ol>
         <li>Draw an image on the canvas.</li>
         <li>Click “Create game” to save and generate a link.</li>
         <li>Share the link with friends to guess your drawing.</li>
+      </ol>
+      <h3>DrawMatch</h3>
+      <ol>
+        <li>Set a theme for the drawing.</li>
+        <li>Click “Create game” to save and generate a link.</li>
+        <li>Share the link with friends to draw a picture.</li>
       </ol>
     </div>
     <script type="module" src="/wallet.js"></script>

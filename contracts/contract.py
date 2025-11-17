@@ -12,9 +12,10 @@ import time
 class Participation:
     creator: bool
     game_time: float
+    game_type: u256
 
     def to_dict(self, game_id: str):
-        return {"id": game_id, "creator": str(self.creator), "game_time": str(self.game_time)}
+        return {"id": game_id, "creator": str(self.creator), "game_time": str(self.game_time), "game_type": str(self.game_type)}
 
 @allow_storage
 @dataclass
@@ -32,20 +33,34 @@ class Game:
     game_id: str
     game_creator: Address
     game_time: float
+    game_type: u256
     game_duration: float
     game_image_link: str
     game_image_desc: str
     game_players: TreeMap[Address, Score]
 
     def to_dict_list(self, time_left: str):
-        return {"id": self.game_id, "creator": str(self.game_creator.as_hex), "time_left": time_left}
+        return {
+            "id": self.game_id, 
+            "type": self.game_type,
+            "creator": str(self.game_creator.as_hex), 
+            "time_left": time_left
+        }
 
     def to_dict_active(self, answered: bool, time_left: str):
-        return {"id": self.game_id, "creator": str(self.game_creator.as_hex), "time_left": time_left, "image": self.game_image_link, "answered": str(answered) }
+        return {
+            "id": self.game_id, 
+            "type": self.game_type,
+            "creator": str(self.game_creator.as_hex), 
+            "time_left": time_left, 
+            "image": self.game_image_link, 
+            "answered": str(answered) 
+        }
 
     def to_dict_completed(self, nicks: TreeMap[Address, str]):
         return {
             "id": self.game_id, 
+            "type": self.game_type,
             "creator": str(self.game_creator.as_hex), 
             "image": self.game_image_link, 
             "desc": self.game_image_desc, 
@@ -70,6 +85,33 @@ class GuessPicture(gl.Contract):
         self.owner = gl.message.sender_address
 
     @gl.public.write
+    def create_match_game(self, game_id: str, image_desc: str) -> None:
+        self.create_match_game_duration(game_id, image_desc, int(self.game_duration))
+
+    @gl.public.write
+    def create_match_game_duration(self, game_id: str, image_desc: str, duration: int) -> None:
+        sender_address = gl.message.sender_address
+        if game_id in self.games_all:
+            raise Exception("Game already created")
+        t = time.time()
+        game = Game(
+            game_id=game_id,
+            game_creator=sender_address,
+            game_time=t,
+            game_type=2,
+            game_duration=float(duration),
+            game_image_link="",
+            game_image_desc=image_desc,
+            game_players=TreeMap()
+        )
+        self.games_all[game_id] = game
+        self.game_index.get_or_insert_default(sender_address)[game_id] = Participation(
+                creator=True,
+                game_time=t,
+                game_type=2
+    )
+
+    @gl.public.write
     def create_game(self, game_id: str, image_link: str) -> None:
         self.create_game_duration(game_id, image_link, int(self.game_duration))
 
@@ -82,7 +124,7 @@ class GuessPicture(gl.Contract):
             try:
                 web_data = gl.nondet.web.render(image_link, mode = "screenshot")
                 png_bytes = getattr(web_data, "raw", web_data)  # fallback if it's already bytes
-                prompt = """
+                desc_image_prompt = """
 Analyze and describe the following image and return the name of the main object on it.
 Return a JSON with the name as follows
 {{
@@ -93,7 +135,7 @@ nothing else. Don't include any other words or characters,
 your output must be only JSON without any formatting prefix or suffix.
 This result should be perfectly parsable by a JSON parser without errors.
                 """
-                result = gl.nondet.exec_prompt(prompt, images=[web_data])
+                result = gl.nondet.exec_prompt(desc_image_prompt, images=[web_data])
                 print("result",result)
                 return json.loads(_extract_json_from_string(result))
             except Exception as e:
@@ -105,6 +147,7 @@ This result should be perfectly parsable by a JSON parser without errors.
                 game_id=game_id,
                 game_creator=sender_address,
                 game_time=t,
+                game_type=1,
                 game_duration=float(duration),
                 game_image_link=image_link,
                 game_image_desc=result_json["object"],
@@ -114,10 +157,129 @@ This result should be perfectly parsable by a JSON parser without errors.
             self.error = result_json["object"]
             self.game_index.get_or_insert_default(sender_address)[game_id] = Participation(
                 creator=True,
-                game_time=t
+                game_time=t,
+                game_type=1
             )
         except Exception as e:
             self.error = "error create: " + str(e)
+
+    @gl.public.write
+    def join_match_game(self, game_id: str, image_link: str) -> None:
+        game = self.games_all.get(game_id)
+        sender_address = gl.message.sender_address
+        if game is None:
+            raise Exception("Game not found")
+        if _check_time_due(game):
+            raise Exception("Time is off")
+        if game.game_type == 1:
+            raise Exception("Wrong game type")
+        if sender_address in game.game_players:
+            raise Exception("You have already played")
+        speed_ratio = _check_speed_ratio(game)
+        def non_det():
+            try:
+                web_data = gl.nondet.web.render(image_link, mode = "screenshot")
+                png_bytes = getattr(web_data, "raw", web_data)  # fallback if it's already bytes
+                desc_image_prompt = """
+Analyze and describe the following image and return the name of the main object on it.
+Return a JSON with the name as follows
+{{
+    "object": str, // the name of the main object in the image
+}}
+It is mandatory that you respond only using the JSON format above,
+nothing else. Don't include any other words or characters,
+your output must be only JSON without any formatting prefix or suffix.
+This result should be perfectly parsable by a JSON parser without errors.
+                """
+                result = gl.nondet.exec_prompt(desc_image_prompt, images=[web_data])
+                print("result",result)
+                return json.loads(_extract_json_from_string(result))
+            except Exception as e:
+                return "error match: " + str(e)
+        result_json = gl.eq_principle.strict_eq(non_det)
+        first = game.game_image_desc
+        answer = result_json["object"]
+        task = f"""
+Compare the following two texts: {first} and {answer}.
+Estimate how similar they are in intended object/name and distinctive meaning.
+Normalization (apply to both texts before comparison):
+Lowercase, trim, collapse whitespace.
+Remove punctuation except within numbers/dates.
+Standardize dates to YYYY-MM-DD.
+Convert number words to digits when unambiguous.
+Cross-lingual normalization: translate tokens to a shared pivot language (English) when dictionary-stable (e.g., “кролик” → “rabbit”, “цвет” → “color”). Use conservative, high-confidence dictionary mappings only.
+Transliteration fallback: when exact translation is uncertain, apply language-appropriate transliteration to compare forms (e.g., “раббит” ≈ “rabbit”, “крол” ≈ “krol”). Treat transliteration similarity as weaker than translation.
+Near-lexeme/abbreviation handling: if a token is a plausible truncation/abbreviation/lemma of another (e.g., “rab” vs “rabbit”), count as a weak match only if no conflicting full-form exists and context supports the same entity/type. Otherwise, treat as mismatch.
+Do not infer missing data beyond the above conservative mappings.
+Identify explicitly present elements:
+Core subject/object (the intended entity or name).
+Key attributes/features (type, properties, qualifiers).
+Actions/behaviors/events (verbs, relations), if relevant.
+Concrete details/examples (numbers, named items, locations), if relevant.
+Scoring (strict 0–4 scale):
+4: Exact match of the intended object’s name in any language, or an exact synonym. Examples:“rabbit” vs “кролик” (rabbit).
+“building” vs “edifice”.
+“accordion” vs “аккордеон”.
+3: Minor syntactic/morphological error in an otherwise correct answer (e.g., misspelling, inflectional variant), or a subspecies/subtype, or an inexact but closely similar synonym sharing most defining features. Examples:“rabitt” vs “rabbit”.
+“bunny” vs “rabbit”.
+“hare” vs “rabbit”.
+“заяц” vs “rabbit”.
+“structure” vs “building”.
+“bayan” vs “accordion”.
+2: The answer names a distinctive key feature without correctly naming the object. Examples:“long-eared” vs “hare”.
+“very tall” vs “skyscraper”.
+“fast projectile” vs “rocket”.
+1: The answer matches only the broad category/group. Examples:“animal” vs “hare”.
+“musical instrument” vs “piano”.
+“building” vs “skyscraper”.
+0: Anything else. No reliable overlap with the intended object; wrong entity; vague/irrelevant; or cross-lingual/near-lexeme equivalence cannot be established with reasonable confidence.
+Conservative matching rules:
+Credit only what is explicitly present in both texts after normalization.
+Cross-lingual equivalence requires dictionary-stable or widely accepted mapping.
+Transliteration/abbreviation matches can justify score 3 when strongly suggestive; if confidence is low or conflicting, assign 0.
+No-idea fallback:
+If you cannot establish at least the category or a distinctive feature with reasonable confidence, assign 0.
+Output format (strict):
+Output only a JSON object with a single key "score".
+"score" must be an integer string in {"0","1","2","3","4"}.
+Do not output anything else.
+
+Return a JSON with the name as follows
+{{
+    "score": str, // the similarity score
+}}
+It is mandatory that you respond only using the JSON format above,
+nothing else. Don't include any other words or characters,
+your output must be only JSON without any formatting prefix or suffix.
+This result should be perfectly parsable by a JSON parser without errors.
+            """
+        def non_det_2():
+            try:
+                result = gl.nondet.exec_prompt(task)
+                print("result",result)
+                return json.loads(_extract_json_from_string(result))
+            except Exception as e:
+                return "error match: " + str(e)
+        result_json_2 = gl.eq_principle.strict_eq(non_det_2)
+        try:
+            score_str = result_json_2["score"]
+            score_num = float(score_str) * self.game_coeff * speed_ratio
+            game.game_players[sender_address] = Score(
+                score=score_num, 
+                speed=speed_ratio, 
+                answer=image_link
+            )
+            if sender_address not in self.points:
+                self.points[sender_address] = 0
+            self.points[sender_address] += int(score_num)
+            self.error = str(score_num)
+            self.game_index.get_or_insert_default(sender_address)[game_id] = Participation(
+                creator=sender_address == game.game_creator,
+                game_time=game.game_time,
+                game_type=2
+            )
+        except Exception as e:
+            self.error = "error answer match: " + str(e)  
 
     @gl.public.write
     def join_game(self, game_id: str, answer: str) -> None:
@@ -129,6 +291,8 @@ This result should be perfectly parsable by a JSON parser without errors.
             raise Exception("Creator cannot play")
         if _check_time_due(game):
             raise Exception("Time is off")
+        if game.game_type == 2:
+            raise Exception("Wrong game type")
         if sender_address in game.game_players:
             raise Exception("You have already played")
 
@@ -210,7 +374,8 @@ This result should be perfectly parsable by a JSON parser without errors.
             self.error = str(score_num)
             self.game_index.get_or_insert_default(sender_address)[game_id] = Participation(
                 creator=False,
-                game_time=game.game_time
+                game_time=game.game_time,
+                game_type=1
             )
         except Exception as e:
             self.error = "error answer: " + str(e)    

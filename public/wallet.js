@@ -6,7 +6,7 @@ const WalletUI = (() => {
 
   let client = null;
   let inited = false;
-  let contract = '0x9EE51F9651AdA079abCC366F13a42E35444e446D';
+  let contract = '0x2a20912465B723066F542Af9BB9d60aC13Bb78a1';
   let baseUrl = 'https://guess-picture.onrender.com';
 
   function maskAddress(a){ if(!a) return ''; return a.slice(0,5)+'…'+a.slice(-4); }
@@ -188,7 +188,77 @@ const WalletUI = (() => {
     }
   }
 
-  async function game(gameUrl, id, picture) {
+  async function answerMatch(answer) {
+    if (!client) return;
+    const clearBtn = document.getElementById('clearCanvas');
+    const submitBtn = document.getElementById('saveCanvas');
+    const progress = document.getElementById('canvasProgress');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (submitBtn) submitBtn.classList.add('hidden');
+    if (progress) progress.classList.remove('hidden');
+    try {
+      const txHash = await client.writeContract({
+        address: contract,
+        functionName: "join_match_game",
+        args: [document.body.dataset.gameId, baseUrl + answer],
+      });
+      console.error('Success tx answer match:', txHash);
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 100,
+        interval: 2000,
+      });
+      console.error('Success setting answer match:', receipt);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      getStat();
+      getGame(document.body.dataset.gameId);
+    } catch (error) {
+      console.error('Error setting answer match:', error);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+    }
+  }
+
+  async function gameMatch(theme) {
+    if (!client) return;
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const clearBtn = document.getElementById('clearBtn');
+    const submitBtn = document.getElementById('saveBtn');
+    const progress = document.getElementById('saveProgress');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (submitBtn) submitBtn.classList.add('hidden');
+    if (progress) progress.classList.remove('hidden');
+    try {
+      const txHash = await client.writeContract({
+        address: contract,
+        functionName: "create_match_game",
+        args: [id, theme],
+      });
+      console.error('Success tx room:', txHash);
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 100,
+        interval: 2000,
+      });
+      console.error('Success setting room:', receipt);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      window.location.href = `/game/${id}`;
+    } catch (error) {
+      console.error('Error setting room:', error);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+    }
+  }
+
+  async function gameGuess(gameUrl, id, picture) {
     if (!client) return;
     const clearBtn = document.getElementById('clearBtn');
     const submitBtn = document.getElementById('saveBtn');
@@ -237,19 +307,36 @@ const WalletUI = (() => {
         dataContainer.classList.remove('hidden');
         emptyContainer.classList.add('hidden');
         const img = document.getElementById('picture');
+        const pad = document.getElementById('pad');
+        const padTheme = document.getElementById('game_theme');
         const timer = document.getElementById('timer');
         const players = document.getElementById('players');
         const answers = document.getElementById('answers');
         const task = document.getElementById('task');
-        if (game.image.length > 0) {
-          img.src = game.image;
-          img.classList.remove('hidden');
-        } else {
+        if (game.type == 2) {
+          padTheme.textContent = 'Draw on the theme of "' + game.desc + '" and join the game.';
+          padTheme.classList.remove('hidden');
           img.classList.add('hidden');
+          if (game.time_left) {
+            pad.classList.remove('hidden');
+            window.resizeCanvas();
+          } else {
+            pad.classList.add('hidden');
+          }
+        } else {
+          padTheme.classList.add('hidden');
+          pad.classList.add('hidden');
+          if (game.image.length > 0) {
+            img.src = game.image;
+            img.classList.remove('hidden');
+          } else {
+            img.classList.add('hidden');
+          }
         }
+       
         if (game.time_left) {
           players.classList.add('hidden');
-          if (game.answered == "True" || getAddress().toLowerCase().trim() == game.creator.toLowerCase().trim()) {
+          if (game.answered == "True" || game.type == 1 && getAddress().toLowerCase().trim() == game.creator.toLowerCase().trim()) {
             answers.style.display = 'none';
             task.classList.remove('hidden');
             if (game.answered == "True") {
@@ -259,7 +346,11 @@ const WalletUI = (() => {
             }
             task.style.padding = '8px 0';
           } else {
-            answers.style.display = 'block';
+            if (game.type == 1) {
+              answers.style.display = 'block';
+            } else {
+              answers.style.display = 'none';
+            }
             task.classList.add('hidden');
             task.textContent = "";
           }
@@ -285,12 +376,16 @@ const WalletUI = (() => {
           }, 1000); 
         } else {
           players.classList.remove('hidden');
-          task.classList.remove('hidden');
           answers.style.display = 'none';
           timer.classList.add('hidden');
-          task.textContent = "Correct answer: " + game.desc
-          task.style.padding = '8px 0';
-          showPlayers(game.players)
+          if (game.type == 1) {
+            task.classList.remove('hidden');
+            task.textContent = "Correct answer: " + game.desc
+            task.style.padding = '8px 0';
+          } else {
+            task.classList.add('hidden');
+          }
+          showPlayers(game.players, game.type)
         }
         break;
       case 2:
@@ -308,7 +403,7 @@ const WalletUI = (() => {
     return (h>0?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); 
   }
 
-  function showPlayers(items) {
+  function showPlayers(items, type) {
     const sorted = [...items].sort((a, b) => {
       const pointsA = Number(a.score) || 0;
       const pointsB = Number(b.score) || 0;
@@ -358,10 +453,18 @@ const WalletUI = (() => {
       }
 
       if (item.answer && String(item.answer).trim() !== '') {
-        const answerEl = document.createElement('div');
-        answerEl.textContent = "Answer: " + String(item.answer);
-        answerEl.style.fontSize = '13px';
-        left.appendChild(answerEl);
+        if (type == 1) {
+          const answerEl = document.createElement('div');
+          answerEl.textContent = "Answer: " + String(item.answer);
+          answerEl.style.fontSize = '13px';
+          left.appendChild(answerEl);
+        } else {
+          const answerEl = document.createElement('img');
+          answerEl.src = 'path/to/image.jpg';
+          answerEl.width = 200; 
+          answerEl.height = 150;
+          container.appendChild(answerEl);
+        }
       }
       
       const pointsEl = document.createElement('div');
@@ -592,7 +695,21 @@ const WalletUI = (() => {
     }
   }
 
-  return { connectWalletAndEnsureNetwork, connect, disconnect, init, isConnected, getAddress, ensureConnected, requireConnectedOnLoad, setNickname, answer, game };
+  return { 
+    connectWalletAndEnsureNetwork, 
+    connect, 
+    disconnect,
+    init, 
+    isConnected, 
+    getAddress, 
+    ensureConnected, 
+    requireConnectedOnLoad, 
+    setNickname, 
+    answer, 
+    answerMatch,
+    gameGuess, 
+    gameMatch
+  };
 })();
 
 if (typeof window !== 'undefined') {
