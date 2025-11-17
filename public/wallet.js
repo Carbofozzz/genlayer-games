@@ -469,7 +469,7 @@ const WalletUI = (() => {
           answerEl.src = item.answer;
           answerEl.width = 200; 
           answerEl.height = 150;
-          nickEl.style.marginTop = '.5rem';
+          answerEl.style.marginTop = '.5rem';
           left.appendChild(answerEl);
         }
       }
