@@ -47,13 +47,14 @@ class Game:
             "time_left": time_left
         }
 
-    def to_dict_active(self, answered: bool, time_left: str):
+    def to_dict_active(self, answered: bool, time_left: str, image_desc: str):
         return {
             "id": self.game_id, 
             "type": self.game_type,
             "creator": str(self.game_creator.as_hex), 
             "time_left": time_left, 
             "image": self.game_image_link, 
+            "desc": image_desc, 
             "answered": str(answered) 
         }
 
@@ -480,11 +481,15 @@ def _parse_players(players: TreeMap[Address, Score], nicks: TreeMap[Address, str
     return result   
 
 def _select_game(game: Game, nicks: TreeMap[Address, str], sender_address: Address) -> dict:
+    desc = ""
+    if game.game_type == 2:
+        desc = game.game_image_desc
     if _check_time_due(game):
         return game.to_dict_completed(nicks)
     return game.to_dict_active(
         sender_address in game.game_players,
-        str(game.game_time + (game.game_duration * 60) - time.time())
+        str(game.game_time + (game.game_duration * 60) - time.time()),
+        desc
     )
 
 def _get_simple_game(game: Game) -> dict:

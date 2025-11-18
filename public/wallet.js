@@ -6,7 +6,7 @@ const WalletUI = (() => {
 
   let client = null;
   let inited = false;
-  let contract = '0x2a20912465B723066F542Af9BB9d60aC13Bb78a1';
+  let contract = '0xaCdE4867a7d559e03c178B2696f62608E961e497';
   let baseUrl = 'https://guess-picture.onrender.com';
 
   function maskAddress(a){ if(!a) return ''; return a.slice(0,5)+'…'+a.slice(-4); }
@@ -350,7 +350,7 @@ const WalletUI = (() => {
             } else {
               task.textContent = "You are the creator of the game and cannot answer your own riddle";
             }
-            task.style.padding = '8px 0';
+            task.style.padding = '16px 0';
           } else {
             if (game.type == 1) {
               answers.style.display = 'block';
@@ -368,6 +368,7 @@ const WalletUI = (() => {
           }
           let secs = 0;
           secs = Math.round(Number(game.time_left));
+          timer.style.color = '#6b7280';
           timer.textContent = 'Game finish in ' + fmt(secs);
           window.dftWidgetTimer = setInterval(()=>{ 
             secs-=1; 
