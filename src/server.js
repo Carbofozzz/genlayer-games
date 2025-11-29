@@ -93,7 +93,7 @@ app.get('/draw-match', (_req, res) => {
 app.get('/match/:id', async (req, res) => {
   try {
     res.set('Content-Type', 'text/html; charset=utf-8');
-    return res.send(getGuessPage(req, "DrawMatch"));
+    return res.send(getGuessPage(req, "DrawMatch", "match"));
   } catch {
     return res.status(500).send('Failed to load game');
   }
@@ -102,7 +102,7 @@ app.get('/match/:id', async (req, res) => {
 app.get('/guess/:id', async (req, res) => {
   try {
     res.set('Content-Type', 'text/html; charset=utf-8');
-    return res.send(getGuessPage(req, "GuessPicture"));
+    return res.send(getGuessPage(req, "GuessPicture", "guess"));
   } catch {
     return res.status(500).send('Failed to load game');
   }
@@ -116,7 +116,7 @@ app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });
 
-function getGuessPage(req, type) {
+function getGuessPage(req, type, mode) {
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -171,7 +171,7 @@ function getGuessPage(req, type) {
       }
     </style>
   </head>
-  <body data-page-name="guess" data-game-id="${req.params.id}">
+  <body data-page-name="${mode}" data-game-id="${req.params.id}">
     <div class="nav">
       <div class="links">
         <a href="/">GuessPicture</a>
