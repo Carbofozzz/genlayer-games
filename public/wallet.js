@@ -6,16 +6,45 @@ const WalletUI = (() => {
 
   let client = null;
   let inited = false;
-  let contract = '0xaCdE4867a7d559e03c178B2696f62608E961e497';
-  let baseUrl = 'https://guess-picture.onrender.com';
+  let contractStat = '0x5e8d3278a2494D2399128D85de22af787AF6284F';
+  let contractGuess = '0x2B76Db7Bd926Cc8401f18A082e20A7071E1716Fe';
+  let contractMatch = '0x28714E559faa2377Da998B0B2766e4337Bcc3350';
+
+  const FLAG_KEY = 'answeredFlags';
 
   function maskAddress(a){ if(!a) return ''; return a.slice(0,5)+'…'+a.slice(-4); }
+
+  function getChangedIds() {
+    try { 
+      return new Set(JSON.parse(localStorage.getItem(FLAG_KEY) || '[]')); 
+    } catch { return new Set(); }
+  }
+    
+  function saveChangedIds(set) {
+    localStorage.setItem(FLAG_KEY, JSON.stringify([...set]));
+  }
+
+  function markChanged(id) {
+    const s = getChangedIds(); 
+    s.add(String(id) + String(localStorage.getItem('connectedAddress'))); 
+    saveChangedIds(s);
+  }
+
+  function clearChanged(id) {
+    const s = getChangedIds(); 
+    s.delete(String(id) + String(localStorage.getItem('connectedAddress'))); 
+    saveChangedIds(s);
+  }
+
+  function isChanged(id) {
+    return getChangedIds().has(String(id) + String(localStorage.getItem('connectedAddress')));
+  }
 
   async function getStat() {
     if (!client) return;
     try {
       const points = await client.readContract({
-        address: contract,
+        address: contractStat,
         functionName: 'get_my_points',
         args: [],
       });
@@ -24,13 +53,16 @@ const WalletUI = (() => {
       let nick = res.nick;
       const addr = document.getElementById('addr');
       const area = document.getElementById('nick');
-      if (nick.trim().length > 0) {
+      if (nick.trim().length > 0 && nick.trim() != "Nick not set") {
         if (addr) addr.textContent = nick + " (points: " + res.points + ")";
         if (area) {
           area.value = nick;
         }
       } else {
         if (addr) addr.textContent = maskAddress(address) + " (points: " + res.points + ")";
+        if (area) {
+          area.value = "";
+        }
       }
       console.error('Success getting stat:', res.points);
     } catch (error) {
@@ -42,7 +74,7 @@ const WalletUI = (() => {
     if (!client) return;
     try {
       const rating = await client.readContract({
-        address: contract,
+        address: contractStat,
         functionName: 'get_points',
         args: [],
       });
@@ -63,9 +95,9 @@ const WalletUI = (() => {
     if (!client) return;
     try {
       const list = await client.readContract({
-        address: contract,
-        functionName: 'get_my_games',
-        args: [],
+        address: contractStat,
+        functionName: 'get_all_my_archive',
+        args: [50],
       });
       let res = JSON.parse(list);
       console.error('Success getting games: ', res);
@@ -85,7 +117,7 @@ const WalletUI = (() => {
     renderGame(0, null);
     try {
       const game = await client.readContract({
-        address: contract,
+        address: contractGuess,
         functionName: 'get_game',
         args: [gameId],
       });
@@ -93,6 +125,42 @@ const WalletUI = (() => {
       if (res.error) {
         renderGame(2, null);
       } else {
+        if (isChanged(gameId)) {
+          if (res.answered == "False") {
+            res.answered = "True";
+          } else {
+            clearChanged(gameId);
+          }
+        }
+        renderGame(1, res);
+      }
+      console.error('Success getting game:', res);
+    } catch (error) {
+      renderGame(2, null);
+      console.error('Error getting game:', error);
+    }
+  }
+
+  async function getGameMatch(gameId) {
+    if (!client) return;
+    renderGame(0, null);
+    try {
+      const game = await client.readContract({
+        address: contractMatch,
+        functionName: 'get_game',
+        args: [gameId],
+      });
+      let res = JSON.parse(game);
+      if (res.error) {
+        renderGame(2, null);
+      } else {
+        if (isChanged(gameId)) {
+          if (res.answered == "False") {
+            res.answered = "True";
+          } else {
+            clearChanged(gameId);
+          }
+        }
         renderGame(1, res);
       }
       console.error('Success getting game:', res);
@@ -108,8 +176,11 @@ const WalletUI = (() => {
       case 'leaderboard':
         getLeaderboard();
         break;
-      case 'game':
+      case 'guess':
         getGame(document.body.dataset.gameId);
+        break;
+      case 'match':
+        getGameMatch(document.body.dataset.gameId);
         break;
       case 'profile':
         getGames();
@@ -129,7 +200,7 @@ const WalletUI = (() => {
     if (progress) progress.classList.remove('hidden');
     try {
       const txHash = await client.writeContract({
-        address: contract,
+        address: contractStat,
         functionName: "set_nickname",
         args: [nick],
       });
@@ -163,7 +234,7 @@ const WalletUI = (() => {
     if (progress) progress.classList.remove('hidden');
     try {
       const txHash = await client.writeContract({
-        address: contract,
+        address: contractGuess,
         functionName: "join_game",
         args: [document.body.dataset.gameId, answer],
       });
@@ -178,6 +249,7 @@ const WalletUI = (() => {
       if (clearBtn) clearBtn.classList.remove('hidden');
       if (submitBtn) submitBtn.classList.remove('hidden');
       if (progress) progress.classList.add('hidden');
+      markChanged(document.body.dataset.gameId);
       getStat();
       getGame(document.body.dataset.gameId);
     } catch (error) {
@@ -198,9 +270,9 @@ const WalletUI = (() => {
     if (progress) progress.classList.remove('hidden');
     try {
       const txHash = await client.writeContract({
-        address: contract,
-        functionName: "join_match_game",
-        args: [document.body.dataset.gameId, baseUrl + answer],
+        address: contractMatch,
+        functionName: "join_game",
+        args: [document.body.dataset.gameId, answer],
       });
       console.error('Success tx answer match:', txHash);
       const receipt = await client.waitForTransactionReceipt({
@@ -213,8 +285,9 @@ const WalletUI = (() => {
       if (clearBtn) clearBtn.classList.remove('hidden');
       if (submitBtn) submitBtn.classList.remove('hidden');
       if (progress) progress.classList.add('hidden');
+      markChanged(document.body.dataset.gameId);
       getStat();
-      getGame(document.body.dataset.gameId);
+      getGameMatch(document.body.dataset.gameId);
     } catch (error) {
       console.error('Error setting answer match:', error);
       if (clearBtn) clearBtn.classList.remove('hidden');
@@ -234,8 +307,8 @@ const WalletUI = (() => {
     if (progress) progress.classList.remove('hidden');
     try {
       const txHash = await client.writeContract({
-        address: contract,
-        functionName: "create_match_game",
+        address: contractMatch,
+        functionName: "create_game",
         args: [id, theme],
       });
       console.error('Success tx room:', txHash);
@@ -249,7 +322,7 @@ const WalletUI = (() => {
       if (clearBtn) clearBtn.classList.remove('hidden');
       if (submitBtn) submitBtn.classList.remove('hidden');
       if (progress) progress.classList.add('hidden');
-      window.location.href = `/game/${id}`;
+      window.location.href = `/match/${id}`;
     } catch (error) {
       console.error('Error setting room:', error);
       if (clearBtn) clearBtn.classList.remove('hidden');
@@ -258,7 +331,7 @@ const WalletUI = (() => {
     }
   }
 
-  async function gameGuess(gameUrl, id, picture) {
+  async function gameGuess(id, picture) {
     if (!client) return;
     const clearBtn = document.getElementById('clearBtn');
     const submitBtn = document.getElementById('saveBtn');
@@ -268,9 +341,9 @@ const WalletUI = (() => {
     if (progress) progress.classList.remove('hidden');
     try {
       const txHash = await client.writeContract({
-        address: contract,
+        address: contractGuess,
         functionName: "create_game",
-        args: [id, baseUrl + picture],
+        args: [id, picture],
       });
       console.error('Success tx game:', txHash);
       const receipt = await client.waitForTransactionReceipt({
@@ -283,7 +356,7 @@ const WalletUI = (() => {
       if (clearBtn) clearBtn.classList.remove('hidden');
       if (submitBtn) submitBtn.classList.remove('hidden');
       if (progress) progress.classList.add('hidden');
-      window.location.href = gameUrl || `/game/${id}`;
+      window.location.href = `/guess/${id}`;
     } catch (error) {
       console.error('Error setting game:', error);
       if (clearBtn) clearBtn.classList.remove('hidden');
@@ -376,7 +449,11 @@ const WalletUI = (() => {
               clearInterval(window.dftWidgetTimer); 
               window.dftWidgetTimer = null; 
               timer.textContent='Finished';
-              getGame(game.id)
+              if (game.type == 1) {
+                getGame(game.id);
+              } else if (game.type == 2) {
+                getGameMatch(game.id);
+              }
             } else { 
               timer.textContent = 'Game finish in ' + fmt(secs);
             } 
@@ -574,8 +651,15 @@ const WalletUI = (() => {
       const left = document.createElement('div');
       const walletEl = document.createElement('div');
       const a = document.createElement('a');
-      a.href = '/game/' + item.id;
-      a.textContent = item.id;
+      if (item.game_type == "1") {
+        a.href = '/guess/' + item.id;
+        a.textContent = "GuessPicture (" + item.id + ")";
+      } else if (item.game_type == "2") {
+        a.href = '/match/' + item.id;
+        a.textContent = "DrawMatch (" + item.id + ")";
+      } else {
+        a.textContent = item.id;
+      }
       walletEl.appendChild(a);
       walletEl.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, monospace';
       walletEl.style.fontSize = '14px';
@@ -716,7 +800,8 @@ const WalletUI = (() => {
     answer, 
     answerMatch,
     gameGuess, 
-    gameMatch
+    gameMatch,
+    checkPage
   };
 })();
 

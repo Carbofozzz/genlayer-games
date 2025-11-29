@@ -104,7 +104,7 @@
           const json = await res.json();
           if (!res.ok) throw new Error(json.error || 'Save failed');
           console.log("Picture ", json)
-          WalletUI.gameGuess(json.gameUrl, json.id, json.url)
+          WalletUI.gameGuess(json.id, json.url)
         } catch (e) {
           alert(e.message);
           clearBtn.classList.remove('hidden');

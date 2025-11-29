@@ -4,7 +4,7 @@ import morgan from 'morgan';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
+import AWS from 'aws-sdk';
 import { evmNetwork } from './config/network.js';
 
 dotenv.config();
@@ -15,6 +15,18 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+const S3_ENDPOINT = process.env.S3_ENDPOINT || "";
+const S3_BUCKET = process.env.S3_BUCKET || "";
+const S3_KEY = process.env.S3_KEY || "";
+const S3_SECRET = process.env.S3_SECRET || "";
+
+const s3 = new AWS.S3({
+  endpoint: S3_ENDPOINT,
+  accessKeyId: S3_KEY,
+  secretAccessKey: S3_SECRET,
+  s3ForcePathStyle: true,
+  signatureVersion: 'v4'
+});
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -37,40 +49,29 @@ app.post('/api/signature', async (req, res) => {
       return res.status(400).json({ error: 'Invalid dataUrl' });
     }
     const [meta, base64] = dataUrl.split(',');
+    const mimeType = meta.substring(meta.indexOf(':') + 1, meta.indexOf(';'));
     const ext = meta.includes('image/png') ? 'png' : meta.includes('image/jpeg') ? 'jpg' : 'png';
     const buffer = Buffer.from(base64, 'base64');
 
-    const uploadsDir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-    const filename = `signature_${Date.now()}.${ext}`;
-    const filePath = path.join(uploadsDir, filename);
-    await fs.promises.writeFile(filePath, buffer);
+    const filename = `signature_${id}.${ext}`;
+    const s3Key = `signatures/${filename}`;
 
-    // Persist game metadata
-    //const dataDir = path.join(__dirname, '../data');
-    //if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-    //const storePath = path.join(dataDir, 'games.json');
-    //let store = {};
-    //try {
-    //  const raw = await fs.promises.readFile(storePath, 'utf8');
-    //  store = JSON.parse(raw || '{}');
-    //} catch {}
-    //const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-    //store[id] = { filename, createdAt: Date.now() };
-    //await fs.promises.writeFile(storePath, JSON.stringify(store, null, 2));
-
-    // Serve uploaded files as static content via /uploads mount
-    // Return game URL and static file URL
-    return res.json({ id, filename, url: `/uploads/${filename}`, gameUrl: `/game/${id}` });
+    const params = {
+      Bucket: S3_BUCKET,
+      Key: s3Key,
+      Body: buffer,
+      ContentType: mimeType,
+      ACL: 'public-read'
+    };
+    const s3UploadResult = await s3.upload(params).promise();
+    const s3Url = s3UploadResult.Location;
+    return res.json({ id, url: s3Url });
   } catch (e) {
+    console.error('Error uploading to S3:', e);
     return res.status(500).json({ error: 'Failed to save file' });
   }
 });
-
-// Static serving for uploaded images
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Static pages routes
 app.get('/leaderboard', (_req, res) => {
@@ -89,16 +90,39 @@ app.get('/draw-match', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/match.html'));
 });
 
-// Dynamic game page
-app.get('/game/:id', async (req, res) => {
+app.get('/match/:id', async (req, res) => {
   try {
     res.set('Content-Type', 'text/html; charset=utf-8');
-    return res.send(`<!doctype html>
+    return res.send(getGuessPage(req, "DrawMatch"));
+  } catch {
+    return res.status(500).send('Failed to load game');
+  }
+});
+
+app.get('/guess/:id', async (req, res) => {
+  try {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    return res.send(getGuessPage(req, "GuessPicture"));
+  } catch {
+    return res.status(500).send('Failed to load game');
+  }
+});
+
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+app.listen(PORT, () => {
+  console.log(`Server listening on http://localhost:${PORT}`);
+});
+
+function getGuessPage(req, type) {
+  return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Game Id: ${req.params.id}</title>
+    <title>GuessPicture Id: ${req.params.id}</title>
     <style>
       #loadingIndicator {
         display: flex;
@@ -147,7 +171,7 @@ app.get('/game/:id', async (req, res) => {
       }
     </style>
   </head>
-  <body data-page-name="game" data-game-id="${req.params.id}">
+  <body data-page-name="guess" data-game-id="${req.params.id}">
     <div class="nav">
       <div class="links">
         <a href="/">GuessPicture</a>
@@ -161,13 +185,15 @@ app.get('/game/:id', async (req, res) => {
       </div>
     </div>
     <div class="wrap">
-      <h1>Game Id: ${req.params.id}</h1>
+      <h1>${type} Id: ${req.params.id}</h1>
       <div id="logoutContainer" class="hidden">
         <p>Please connect your wallet first</p>
       </div>
       <div id="loginContainer" class="hidden">
         <div id="emptyContainer" class="hidden">
           <p>Game not found</p>
+          <p>If the game was created recently, try refreshing the page.</p>
+          <button id="refresh" class="btn" style="margin-top:1rem;">Refresh</button>
         </div>
         <div id="loadingIndicator" class="hidden">
           <div class="spinner"></div>
@@ -214,6 +240,7 @@ app.get('/game/:id', async (req, res) => {
       const clearCanvasBtn = document.getElementById('clearCanvas');
       const submitCanvasBtn = document.getElementById('saveCanvas');
       const progressCanvas = document.getElementById('canvasProgress');
+      const refreshBtn = document.getElementById('refresh');
       function resizeCanvas() {
         const ratio = Math.max(window.devicePixelRatio || 1, 1);
         const rect = canvas.getBoundingClientRect();
@@ -267,18 +294,13 @@ app.get('/game/:id', async (req, res) => {
           WalletUI.answer(value);
         } catch(e) { alert(e.message); }
       });
+      if (refreshBtn) refreshBtn.addEventListener('click', async () => {
+        try {
+          if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+          WalletUI.checkPage();
+        } catch(e) { alert(e.message); }
+      });
     </script>
   </body>
-</html>`);
-  } catch {
-    return res.status(500).send('Failed to load game');
-  }
-});
-
-app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
+</html>`
+}
