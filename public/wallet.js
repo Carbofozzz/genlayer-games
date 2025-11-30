@@ -6,9 +6,9 @@ const WalletUI = (() => {
 
   let client = null;
   let inited = false;
-  let contractStat = '0x5e8d3278a2494D2399128D85de22af787AF6284F';
-  let contractGuess = '0x2B76Db7Bd926Cc8401f18A082e20A7071E1716Fe';
-  let contractMatch = '0x28714E559faa2377Da998B0B2766e4337Bcc3350';
+  let contractStat = '0xa5128Cc6bC90504A621dee971d978253677d3F7F';
+  let contractGuess = '0x7e7eaB74f2470B8701A4C2ef1E55c811Dd79563b';
+  let contractMatch = '0x646355170D06a3F310E70Eb68eC7c75Bc2993f6f';
 
   const FLAG_KEY = 'answeredFlags';
 
@@ -76,7 +76,7 @@ const WalletUI = (() => {
       const rating = await client.readContract({
         address: contractStat,
         functionName: 'get_points',
-        args: [],
+        args: [50],
       });
       let res = JSON.parse(rating);
       console.error('Success getting leaderboard: ', res);

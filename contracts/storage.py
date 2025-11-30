@@ -106,17 +106,17 @@ class GuessGameStorage(gl.Contract):
         game_image_link: str,
         game_image_desc: str,
         game_type: int, 
-        duration: int
+        duration: int,
+        time: str
     ) -> None:
         if gl.message.sender_address not in self.admins:
             raise Exception("You are not an admin")
         if game_id in self.games:
             raise Exception("Game already created")
-        t = time.time()
         game = Game(
             game_id=game_id,
             game_creator=Address(game_creator),
-            game_time=t,
+            game_time=float(time),
             game_type=game_type,
             game_duration=float(duration),
             game_image_link=game_image_link,
@@ -149,6 +149,41 @@ class GuessGameStorage(gl.Contract):
             self.error = "Edit game success: " + player + ", " + str(score)
         except Exception as e:
             self.error = "Edit game error: " + str(e) + ", " + game_id
+
+    @gl.public.write
+    def replace_game(
+        self, 
+        game_id: str, 
+        game_creator: str,
+        game_image_link: str,
+        game_image_desc: str,
+        game_type: int, 
+        duration: int,
+        time: str,
+        scores: dict[str, str],
+        answers: dict[str, str]
+    ) -> None:
+        if gl.message.sender_address not in self.admins:
+            raise Exception("You are not an admin")
+        scores = _to_dict(scores)
+        answers = _to_dict(answers)
+        players=TreeMap()
+        for k in answers:
+            score_str = scores.get(k)
+            if score_str is None:
+                players[Address(k)] = Score(score=0, answer=answers[k])
+            players[Address(k)] = Score(score=int(score_str), answer=answers[k])
+        game = Game(
+            game_id=game_id,
+            game_creator=Address(game_creator),
+            game_time=float(time),
+            game_type=game_type,
+            game_duration=float(duration),
+            game_image_link=game_image_link,
+            game_image_desc=game_image_desc,
+            game_players=players
+        )
+        self.games[game_id] = game
 
     @gl.public.view
     def get_game(self, game_id: str, pwd: str) -> dict:
@@ -184,3 +219,13 @@ def _parse_players(players: TreeMap[Address, Score], full: bool) -> dict:
 
 def _check_time_due(game: Game) -> bool:
     return time.time() - game.game_time >= game.game_duration * 60
+
+def _to_dict(maybe_dict):
+    if isinstance(maybe_dict, dict):
+        return maybe_dict
+    if isinstance(maybe_dict, list):
+        if all(isinstance(x, (list, tuple)) and len(x) == 2 for x in maybe_dict):
+            return {k: v for k, v in maybe_dict}
+        if all(isinstance(x, dict) and "key" in x and "value" in x for x in maybe_dict):
+            return {x["key"]: x["value"] for x in maybe_dict}
+    return {}

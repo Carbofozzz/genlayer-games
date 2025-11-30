@@ -52,7 +52,7 @@ class UserStat(gl.Contract):
             self.error = "Clear admins error: " + str(e)
 
     @gl.public.write
-    def set_user_point(self, player_address: str, point: u256) -> None:
+    def add_user_points(self, player_address: str, point: u256) -> None:
         signer = gl.message.sender_address
         try:
             if signer not in self.admins:
@@ -80,6 +80,25 @@ class UserStat(gl.Contract):
             self.error = "Add archive '" + signer.as_hex + "' error: " + str(e)
 
     @gl.public.write
+    def add_user_points_game_to_archive(self, player_address: str, game_id: str, game_time: str, game_type: u256, point: u256) -> None:
+        signer = gl.message.sender_address
+        try:
+            if signer not in self.admins:
+                raise Exception("You are not an admin")
+            self.games_archive.get_or_insert_default(Address(player_address))[game_id] = GameArchive(
+                is_creator=False,
+                game_time=float(game_time),
+                game_type=game_type,
+                game_id=game_id
+            )
+            pa = Address(player_address)
+            if pa not in self.points:
+                self.points[pa] = 0
+            self.points[pa] += point
+        except Exception as e:
+            self.error = "Add archive '" + signer.as_hex + "' error: " + str(e)
+
+    @gl.public.write
     def set_nickname(self, nick: str) -> None:
         self.nicknames[gl.message.sender_address] = truncate(nick, 25)
 
@@ -99,9 +118,9 @@ class UserStat(gl.Contract):
         return {k.as_hex: v for k, v in self.nicknames.items()}
 
     @gl.public.view
-    def get_points(self) -> str:
+    def get_points(self, limit: int) -> str:
         result = []
-        for k, v in self.points.items():
+        for k, v in sorted(self.points.items(), key=lambda kv: float(kv[1]), reverse=True)[:limit]:
             result.append({ "wallet": k.as_hex, "nick": self.get_player_nickname(k.as_hex), "points": str(v) })
         return json.dumps(result)
 

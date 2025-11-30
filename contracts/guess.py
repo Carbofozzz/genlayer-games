@@ -13,8 +13,9 @@ class StatIface:
         def get_nicknames(self) -> dict: ...
  
     class Write:
-        def set_user_point(self, player_address: str, point: u256) -> None: ...
+        def add_user_points(self, player_address: str, point: u256) -> None: ...
         def add_game_to_archive(self, player_address: str, game_id: str, is_creator: bool, game_time: str, game_type: u256) -> None: ...
+        def add_user_points_game_to_archive(self, player_address: str, game_id: str, game_time: str, game_type: u256, point: u256) -> None: ...
 
 @gl.contract_interface
 class StorageIface:
@@ -22,8 +23,59 @@ class StorageIface:
         def get_game(self, game_id: str, pwd: str) -> dict: ...
 
     class Write:
-        def add_game(self, game_id: str, game_creator: str, game_image_link: str, game_image_desc: str, game_type: int, duration: int) -> None: ...
+        def add_game(self, game_id: str, game_creator: str, game_image_link: str, game_image_desc: str, game_type: int, duration: int, time: str) -> None: ...
+        def replace_game(self, game_id: str, game_creator: str, game_image_link: str, game_image_desc: str, game_type: int, duration: int, time: str, scores: dict[str, str], answers: dict[str, str]) -> None: ...
         def edit_game(self, game_id: str, player: str, score: int, answer: str) -> None: ...
+
+@allow_storage
+@dataclass
+class Score:
+    score: u256
+    answer: str
+
+    def to_dict(self, address: str, full: bool):
+        if full:
+            return {"score": str(self.score), "answer": str(self.answer), "address": address}
+        return {"address": address}
+
+@allow_storage
+@dataclass
+class Game:
+    game_id: str
+    game_creator: Address
+    game_time: float
+    game_type: u256
+    game_duration: float
+    game_image_link: str
+    game_image_desc: str
+    game_players: TreeMap[Address, Score]
+
+    def to_dict(self, admin: bool):
+        if _check_time_due(self):
+            return {
+                "game_id": self.game_id, 
+                "game_creator": self.game_creator.as_hex,
+                "game_time": str(self.game_time),
+                "game_type": str(self.game_type),
+                "game_duration": str(self.game_duration),
+                "game_image_link": self.game_image_link, 
+                "game_image_desc": self.game_image_desc, 
+                "game_players": _parse_players(self.game_players, True)
+            }
+        desc = ""
+        if self.game_type == 2 or admin:
+            desc = self.game_image_desc
+        return {
+            "game_id": self.game_id, 
+            "game_creator": self.game_creator.as_hex, 
+            "game_time": str(self.game_time),
+            "game_type": str(self.game_type),
+            "game_duration": str(self.game_duration),
+            "game_image_link": self.game_image_link, 
+            "game_image_desc": desc,
+            "game_time_left": str(self.game_time + (self.game_duration * 60) - time.time()),
+            "game_players": _parse_players(self.game_players, False)
+        }
 
 class GuessPicture(gl.Contract):
     game_duration: float
@@ -33,6 +85,7 @@ class GuessPicture(gl.Contract):
     owner: Address
     stat: Address
     storage: Address
+    active_games: TreeMap[Address, Game]
 
     def __init__(self, stat_contract: str, storage_contract: str):
         self.game_duration = 10
@@ -80,8 +133,25 @@ class GuessPicture(gl.Contract):
     @gl.public.write
     def create_game_duration(self, game_id: str, image_link: str, duration: int) -> None:
         sender_address = gl.message.sender_address
-        game = StorageIface(self.storage).view().get_game(game_id, "")
-        if "game_id" in game:
+        game_cache = self.active_games.get(sender_address)
+        if game_cache is not None and game_cache.game_id == game_id:
+            raise Exception("Game already created")
+        if game_cache is not None and game_cache.game_id != game_id:
+            scores = {k.as_hex: str(v.score) for k, v in game_cache.game_players.items()}
+            answers = {k.as_hex: v.answer for k, v in game_cache.game_players.items()}
+            StorageIface(self.storage).emit().replace_game(
+                game_cache.game_id, 
+                game_cache.game_creator.as_hex,
+                game_cache.game_image_link, 
+                game_cache.game_image_desc, 
+                1, 
+                int(game_cache.game_duration),
+                str(game_cache.game_time),
+                scores,
+                answers
+            )
+        game_storage = StorageIface(self.storage).view().get_game(game_id, "")
+        if "game_id" in game_storage:
             raise Exception("Game already created")
         desc_image_prompt = """
 Analyze and describe the following image and return the name of the main object on it.
@@ -103,8 +173,20 @@ This result should be perfectly parsable by a JSON parser without errors.
                 return "error: " + str(e)
         result_ai = gl.eq_principle.strict_eq(non_det)
         try:
-            StorageIface(self.storage).emit().add_game(game_id, sender_address.as_hex, image_link, result_ai, 1, duration)
-            StatIface(self.stat).emit().add_game_to_archive(sender_address.as_hex, game_id, True, str(time.time()), 1)
+            t = time.time()
+            game = Game(
+                game_id=game_id,
+                game_creator=sender_address,
+                game_time=t,
+                game_type=1,
+                game_duration=float(duration),
+                game_image_link=image_link,
+                game_image_desc=result_ai,
+                game_players=TreeMap()
+            )
+            self.active_games[sender_address] = game
+            StorageIface(self.storage).emit().add_game(game_id, sender_address.as_hex, image_link, result_ai, 1, duration, str(t))
+            StatIface(self.stat).emit().add_game_to_archive(sender_address.as_hex, game_id, True, str(t), 1)
             self.error = result_ai
         except Exception as e:
             self.error = "error create: " + str(e)
@@ -112,7 +194,10 @@ This result should be perfectly parsable by a JSON parser without errors.
     @gl.public.write
     def join_game(self, game_id: str, answer: str) -> None:
         sender_address = gl.message.sender_address
+        game_cache = self.active_games.get(sender_address)
         game = StorageIface(self.storage).view().get_game(game_id, self.secret)
+        if game_cache is not None and game_cache.game_id == game_id:
+            game = game_cache.to_dict(True)
 
         if "error" in game:
             raise Exception("Game not found")
@@ -190,9 +275,10 @@ This result should be perfectly parsable by a JSON parser without errors.
         result_score = gl.eq_principle.strict_eq(non_det)
         try:
             score_num = float(result_score) * self.game_coeff * speed_ratio
+            if game_cache is not None and game_cache.game_id == game_id:
+                game_cache.game_players[sender_address] = Score(score=int(score_num), answer=answer)
             StorageIface(self.storage).emit().edit_game(game_id, sender_address.as_hex, int(score_num), answer)
-            StatIface(self.stat).emit().set_user_point(sender_address.as_hex, int(score_num))
-            StatIface(self.stat).emit().add_game_to_archive(sender_address.as_hex, game_id, False, game.get("game_time"), 1)
+            StatIface(self.stat).emit().add_user_points_game_to_archive(sender_address.as_hex, game_id, game.get("game_time"), 1, int(score_num))
             self.error = str(score_num)
         except Exception as e:
             self.error = "error answer: " + str(e)
@@ -211,7 +297,10 @@ This result should be perfectly parsable by a JSON parser without errors.
 
     @gl.public.view
     def get_game(self, game_id: str) -> str:
+        game_cache = next((v for k, v in self.active_games.items() if v.game_id == game_id), None)
         game = StorageIface(self.storage).view().get_game(game_id, "")
+        if game_cache is not None:
+            game = game_cache.to_dict(False)  
         try:
             if "error" in game:
                 raise Exception(game.get("error"))
@@ -245,6 +334,15 @@ def _select_game(game: dict[str, str], nicks: dict[str, str], sender_address: Ad
 
 def _check_speed_ratio(game: dict[str, str]) -> float:
     return 1.0 - (time.time() - float(game.get("game_time"))) / (float(game.get("game_duration")) * 60)
+
+def _parse_players(players: TreeMap[Address, Score], full: bool) -> dict:
+    result = []
+    for address, score in players.items():
+        result.append(score.to_dict(str(address.as_hex), full))
+    return result
+
+def _check_time_due(game: Game) -> bool:
+    return time.time() - game.game_time >= game.game_duration * 60
 
 def _extract_json_from_string(s: str) -> str:
     """

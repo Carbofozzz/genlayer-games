@@ -122,7 +122,7 @@ function getGuessPage(req, type, mode) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>GuessPicture Id: ${req.params.id}</title>
+    <title>${type} Id: ${req.params.id}</title>
     <style>
       #loadingIndicator {
         display: flex;
