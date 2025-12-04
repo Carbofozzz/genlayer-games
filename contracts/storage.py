@@ -2,9 +2,7 @@
 # { "Depends": "py-genlayer:latest" }
 from genlayer import *
 from dataclasses import dataclass
-
-import typing
-import time
+from datetime import datetime, timezone
 
 @allow_storage
 @dataclass
@@ -22,19 +20,19 @@ class Score:
 class Game:
     game_id: str
     game_creator: Address
-    game_time: float
+    game_time: str
     game_type: u256
-    game_duration: float
+    game_duration: u256
     game_image_link: str
     game_image_desc: str
     game_players: TreeMap[Address, Score]
 
-    def to_dict(self, admin: bool):
-        if _check_time_due(self):
+    def to_dict(self, admin: bool, time_str: str):
+        if _check_time_due(self, time_str):
             return {
                 "game_id": self.game_id, 
                 "game_creator": self.game_creator.as_hex,
-                "game_time": str(self.game_time),
+                "game_time": self.game_time,
                 "game_type": str(self.game_type),
                 "game_duration": str(self.game_duration),
                 "game_image_link": self.game_image_link, 
@@ -47,12 +45,12 @@ class Game:
         return {
             "game_id": self.game_id, 
             "game_creator": self.game_creator.as_hex, 
-            "game_time": str(self.game_time),
+            "game_time": self.game_time,
             "game_type": str(self.game_type),
             "game_duration": str(self.game_duration),
             "game_image_link": self.game_image_link, 
             "game_image_desc": desc,
-            "game_time_left": str(self.game_time + (self.game_duration * 60) - time.time()),
+            "game_time_left": str(float(self.game_time) + (self.game_duration * 60) - float(_convert_time(time_str))),
             "game_players": _parse_players(self.game_players, False)
         }
 
@@ -116,9 +114,9 @@ class GuessGameStorage(gl.Contract):
         game = Game(
             game_id=game_id,
             game_creator=Address(game_creator),
-            game_time=float(time),
+            game_time=time,
             game_type=game_type,
-            game_duration=float(duration),
+            game_duration=duration,
             game_image_link=game_image_link,
             game_image_desc=game_image_desc,
             game_players=TreeMap()
@@ -176,9 +174,9 @@ class GuessGameStorage(gl.Contract):
         game = Game(
             game_id=game_id,
             game_creator=Address(game_creator),
-            game_time=float(time),
+            game_time=time,
             game_type=game_type,
-            game_duration=float(duration),
+            game_duration=duration,
             game_image_link=game_image_link,
             game_image_desc=game_image_desc,
             game_players=players
@@ -191,7 +189,7 @@ class GuessGameStorage(gl.Contract):
         try:
             if game is None:
                 return { "error": "Game not found" }
-            return game.to_dict(self.secret == pwd)
+            return game.to_dict(self.secret == pwd, gl.message_raw["datetime"])
         except Exception as e:
             return { "error": str(e) }
 
@@ -217,8 +215,8 @@ def _parse_players(players: TreeMap[Address, Score], full: bool) -> dict:
         result.append(score.to_dict(str(address.as_hex), full))
     return result
 
-def _check_time_due(game: Game) -> bool:
-    return time.time() - game.game_time >= game.game_duration * 60
+def _check_time_due(game: Game, time_str: str) -> bool:
+    return float(_convert_time(time_str)) - float(game.game_time) >= game.game_duration * 60
 
 def _to_dict(maybe_dict):
     if isinstance(maybe_dict, dict):
@@ -229,3 +227,7 @@ def _to_dict(maybe_dict):
         if all(isinstance(x, dict) and "key" in x and "value" in x for x in maybe_dict):
             return {x["key"]: x["value"] for x in maybe_dict}
     return {}
+
+def _convert_time(time_str: str) -> str:
+        dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+        str(dt.timestamp())

@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import AWS from 'aws-sdk';
 import { evmNetwork } from './config/network.js';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -19,6 +20,9 @@ const S3_ENDPOINT = process.env.S3_ENDPOINT || "";
 const S3_BUCKET = process.env.S3_BUCKET || "";
 const S3_KEY = process.env.S3_KEY || "";
 const S3_SECRET = process.env.S3_SECRET || "";
+const QUIZ_KEY_RAW = process.env.QUIZ_KEY || "";
+
+const QUIZ_KEY = QUIZ_KEY_RAW ? crypto.createHash('sha256').update(QUIZ_KEY_RAW, 'utf8').digest() : null;
 
 const s3 = new AWS.S3({
   endpoint: S3_ENDPOINT,
@@ -27,6 +31,24 @@ const s3 = new AWS.S3({
   s3ForcePathStyle: true,
   signatureVersion: 'v4'
 });
+
+function sealAnswerPlain(obj) {
+  const password = QUIZ_KEY_RAW;
+  if (!password) throw new Error('No QUIZ_KEY');
+  const rounds = 5000;
+  const salt = crypto.randomBytes(16);
+  const plaintext = Buffer.from(JSON.stringify(obj), 'utf8');
+  let h = crypto.createHash('sha256').update(Buffer.concat([Buffer.from(password, 'utf8'), salt])).digest();
+  for (let i = 0; i < rounds - 1; i++) {
+    h = crypto.createHash('sha256').update(h).digest();
+  }
+  const key = h;
+  const ct = Buffer.alloc(plaintext.length);
+  for (let i = 0; i < plaintext.length; i++) {
+    ct[i] = plaintext[i] ^ key[i % key.length];
+  }
+  return Buffer.concat([salt, ct]).toString('base64');
+}
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -73,6 +95,19 @@ app.post('/api/signature', async (req, res) => {
   }
 });
 
+app.post('/api/quiz', async (req, res) => {
+  try {
+    const { answer_id, answer } = req.body || {};
+    if (typeof answer !== 'string') return res.status(400).json({ error: 'Invalid answer' });
+    const payload = { answer_id: answer_id || null, answer: answer, ts: Date.now() };
+    const sealed = sealAnswerPlain(payload);
+    return res.json({ sealed });
+  } catch (e) {
+    console.error('Error encode:', e);
+    return res.status(500).json({ error: 'Failed to save answer' });
+  }
+});
+
 // Static pages routes
 app.get('/leaderboard', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/leaderboard.html'));
@@ -86,8 +121,25 @@ app.get('/rules', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/rules.html'));
 });
 
+app.get('/guess', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/guess.html'));
+});
+
+app.get('/quiz', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/quiz.html'));
+});
+
 app.get('/draw-match', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/match.html'));
+});
+
+app.get('/quiz/:id', async (req, res) => {
+  try {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    return res.send("");
+  } catch {
+    return res.status(500).send('Failed to load game');
+  }
 });
 
 app.get('/match/:id', async (req, res) => {
@@ -174,8 +226,7 @@ function getGuessPage(req, type, mode) {
   <body data-page-name="${mode}" data-game-id="${req.params.id}">
     <div class="nav">
       <div class="links">
-        <a href="/">GuessPicture</a>
-        <a href="/draw-match">DrawMatch</a>
+        <a href="/">New Game</a>
         <a href="/leaderboard">Leaderboard</a>
         <a href="/rules">Rules</a>
       </div>

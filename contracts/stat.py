@@ -4,24 +4,23 @@ from genlayer import *
 from dataclasses import dataclass
 
 import json
-import typing
-import time
 
 @allow_storage
 @dataclass
 class GameArchive:
     is_creator: bool
-    game_time: float
+    game_time: str
     game_id: str
     game_type: u256
 
     def to_dict(self):
-        return {"id": self.game_id, "creator": str(self.is_creator), "game_time": str(self.game_time), "game_type": str(self.game_type)}
+        return {"id": self.game_id, "creator": str(self.is_creator), "game_time": self.game_time, "game_type": str(self.game_type)}
 
 class UserStat(gl.Contract):
     owner: Address
     admins: DynArray[Address]
     points: TreeMap[Address, u256]
+    points_by_game: TreeMap[Address, TreeMap[u256, u256]]
     nicknames: TreeMap[Address, str]
     games_archive: TreeMap[Address, TreeMap[str, GameArchive]]
     error: str
@@ -65,6 +64,23 @@ class UserStat(gl.Contract):
             self.error = "Set point from '" + signer.as_hex + "' error: " + str(e)
 
     @gl.public.write
+    def add_user_points_by_game(self, player_address: str, game_type: u256, point: u256) -> None:
+        signer = gl.message.sender_address
+        try:
+            if signer not in self.admins:
+                raise Exception("You are not an admin")
+            pa = Address(player_address)
+            if pa not in self.points:
+                self.points[pa] = 0
+            self.points[pa] += point
+            pp = self.points_by_game.get_or_insert_default(pa)
+            if game_type not in pp:
+                pp[game_type] = 0
+            self.points_by_game.get(pa)[game_type] += point
+        except Exception as e:
+            self.error = "Set point from '" + signer.as_hex + "' error: " + str(e)
+
+    @gl.public.write
     def add_game_to_archive(self, player_address: str, game_id: str, is_creator: bool, game_time: str, game_type: u256) -> None:
         signer = gl.message.sender_address
         try:
@@ -72,7 +88,7 @@ class UserStat(gl.Contract):
                 raise Exception("You are not an admin")
             self.games_archive.get_or_insert_default(Address(player_address))[game_id] = GameArchive(
                 is_creator=is_creator,
-                game_time=float(game_time),
+                game_time=game_time,
                 game_type=game_type,
                 game_id=game_id
             )
@@ -87,7 +103,7 @@ class UserStat(gl.Contract):
                 raise Exception("You are not an admin")
             self.games_archive.get_or_insert_default(Address(player_address))[game_id] = GameArchive(
                 is_creator=False,
-                game_time=float(game_time),
+                game_time=game_time,
                 game_type=game_type,
                 game_id=game_id
             )
@@ -95,6 +111,10 @@ class UserStat(gl.Contract):
             if pa not in self.points:
                 self.points[pa] = 0
             self.points[pa] += point
+            pp = self.points_by_game.get_or_insert_default(pa)
+            if game_type not in pp:
+                pp[game_type] = 0
+            self.points_by_game.get(pa)[game_type] += point
         except Exception as e:
             self.error = "Add archive '" + signer.as_hex + "' error: " + str(e)
 
@@ -118,17 +138,30 @@ class UserStat(gl.Contract):
         return {k.as_hex: v for k, v in self.nicknames.items()}
 
     @gl.public.view
-    def get_points(self, limit: int) -> str:
+    def get_points(self, limit: u256) -> str:
         result = []
         for k, v in sorted(self.points.items(), key=lambda kv: float(kv[1]), reverse=True)[:limit]:
             result.append({ "wallet": k.as_hex, "nick": self.get_player_nickname(k.as_hex), "points": str(v) })
         return json.dumps(result)
 
     @gl.public.view
+    def get_points_by_game(self, game_type: u256, limit: u256) -> str:
+        result = []
+        for k, v in sorted(self.points_by_game.items(), key=lambda kv: float(kv[1].get(game_type, 0)), reverse=True)[:limit]:
+            result.append({ "wallet": k.as_hex, "nick": self.get_player_nickname(k.as_hex), "points": str(v.get(game_type, 0)) })
+        return json.dumps(result)
+
+    @gl.public.view
     def get_player_points(self, player_address: str) -> str:
         try:
             result = self.points.get(Address(player_address), 0)
-            return json.dumps({ "wallet": player_address, "nick": self.get_player_nickname(player_address), "points": str(result) })
+            result_games = self.points_by_game.get(Address(player_address), TreeMap())
+            return json.dumps({ 
+                "wallet": player_address, 
+                "nick": self.get_player_nickname(player_address), 
+                "points": str(result),
+                "points_by_game": [ {"game_type": str(k), "points": str(v)} for k, v in result_games.items() ]
+            })
         except Exception as e:
             return json.dumps({ "error": str(e) })
 
@@ -137,7 +170,7 @@ class UserStat(gl.Contract):
         return self.get_player_points(gl.message.sender_address.as_hex)
 
     @gl.public.view
-    def get_all_my_archive(self, limit: int) -> str:
+    def get_all_my_archive(self, limit: u256) -> str:
         games = self.games_archive.get(gl.message.sender_address)
         try:
             result = [] 
@@ -148,7 +181,7 @@ class UserStat(gl.Contract):
             return json.dumps({ "error": str(e) })
 
     @gl.public.view
-    def get_my_archive_by_role(self, creator: bool, limit: int) -> str:
+    def get_my_archive_by_role(self, creator: bool, limit: u256) -> str:
         games = self.games_archive.get(gl.message.sender_address)
         try:
             result = [] 

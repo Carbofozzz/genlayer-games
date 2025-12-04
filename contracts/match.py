@@ -2,10 +2,8 @@
 # { "Depends": "py-genlayer:latest" }
 from genlayer import *
 from dataclasses import dataclass
-
+from datetime import datetime, timezone
 import json
-import typing
-import time
 
 @gl.contract_interface
 class StatIface:
@@ -13,7 +11,7 @@ class StatIface:
         def get_nicknames(self) -> dict: ...
  
     class Write:
-        def add_user_points(self, player_address: str, point: u256) -> None: ...
+        def add_user_points_by_game(self, player_address: str, game_type: u256, point: u256) -> None: ...
         def add_game_to_archive(self, player_address: str, game_id: str, is_creator: bool, game_time: str, game_type: u256) -> None: ...
         def add_user_points_game_to_archive(self, player_address: str, game_id: str, game_time: str, game_type: u256, point: u256) -> None: ...
 
@@ -43,19 +41,19 @@ class Score:
 class Game:
     game_id: str
     game_creator: Address
-    game_time: float
+    game_time: str
     game_type: u256
-    game_duration: float
+    game_duration: u256
     game_image_link: str
     game_image_desc: str
     game_players: TreeMap[Address, Score]
 
-    def to_dict(self, admin: bool):
-        if _check_time_due(self):
+    def to_dict(self, admin: bool, time_str: str):
+        if _check_time_due(self, time_str):
             return {
                 "game_id": self.game_id, 
                 "game_creator": self.game_creator.as_hex,
-                "game_time": str(self.game_time),
+                "game_time": self.game_time,
                 "game_type": str(self.game_type),
                 "game_duration": str(self.game_duration),
                 "game_image_link": self.game_image_link, 
@@ -68,18 +66,18 @@ class Game:
         return {
             "game_id": self.game_id, 
             "game_creator": self.game_creator.as_hex, 
-            "game_time": str(self.game_time),
+            "game_time": self.game_time,
             "game_type": str(self.game_type),
             "game_duration": str(self.game_duration),
             "game_image_link": self.game_image_link, 
             "game_image_desc": desc,
-            "game_time_left": str(self.game_time + (self.game_duration * 60) - time.time()),
+            "game_time_left": str(float(self.game_time) + (self.game_duration * 60) - float(_convert_time(time_str))),
             "game_players": _parse_players(self.game_players, False)
         }
 
 class DrawMatch(gl.Contract):
-    game_duration: float
-    game_coeff: float
+    game_duration: u256
+    game_coeff: u256
     error: str
     secret: str
     owner: Address
@@ -146,7 +144,7 @@ class DrawMatch(gl.Contract):
                 game_cache.game_image_desc, 
                 2, 
                 int(game_cache.game_duration),
-                str(game_cache.game_time),
+                game_cache.game_time,
                 scores,
                 answers
             )
@@ -154,13 +152,13 @@ class DrawMatch(gl.Contract):
         if "game_id" in game_storage:
             raise Exception("Game already created")
         try:
-            t = time.time()
+            t = _convert_time(gl.message_raw["datetime"])
             game = Game(
                 game_id=game_id,
                 game_creator=sender_address,
                 game_time=t,
                 game_type=2,
-                game_duration=float(duration),
+                game_duration=duration,
                 game_image_link="",
                 game_image_desc=image_desc,
                 game_players=TreeMap()
@@ -175,10 +173,11 @@ class DrawMatch(gl.Contract):
     @gl.public.write
     def join_game(self, game_id: str, image_link: str) -> None:
         sender_address = gl.message.sender_address
-        game_cache = self.active_games.get(sender_address)
+        game_cache = next((v for k, v in self.active_games.items() if v.game_id == game_id), None)
         game = StorageIface(self.storage).view().get_game(game_id, self.secret)
+        time_str = gl.message_raw["datetime"]
         if game_cache is not None and game_cache.game_id == game_id:
-            game = game_cache.to_dict(True)  
+            game = game_cache.to_dict(True, time_str)  
         if "error" in game:
             raise Exception("Game not found")
         if "game_time_left" not in game:
@@ -189,7 +188,7 @@ class DrawMatch(gl.Contract):
             raise Exception("You have already played")
         if game_cache is not None and game_cache.game_id == game_id:
             game_cache.game_players[sender_address] = Score(score=0, answer=image_link)     
-        speed_ratio = _check_speed_ratio(game)
+        speed_ratio = _check_speed_ratio(game, time_str)
         desc_image_prompt = """
 Analyze and describe the following image and return the name of the main object on it.
 Return a JSON with the name as follows
@@ -272,14 +271,14 @@ This result should be perfectly parsable by a JSON parser without errors.
                 return "error: " + str(e)
         result_score = gl.eq_principle.strict_eq(non_det_2)
         try:
-            score_num = float(result_score) * self.game_coeff * speed_ratio
+            score_num = float(result_score) * float(self.game_coeff) * speed_ratio
             if game_cache is not None and game_cache.game_id == game_id:
                 game_cache.game_players[sender_address] = Score(score=int(score_num), answer=image_link)
             StorageIface(self.storage).emit().edit_game(game_id, sender_address.as_hex, int(score_num), image_link)
             if sender_address.as_hex != game.get("game_creator"):
                 StatIface(self.stat).emit().add_user_points_game_to_archive(sender_address.as_hex, game_id, game.get("game_time"), 2, int(score_num))
             else:
-                StatIface(self.stat).emit().add_user_points(sender_address.as_hex, int(score_num))
+                StatIface(self.stat).emit().add_user_points_by_game(sender_address.as_hex, 2, int(score_num))
             self.error = str(score_num)
         except Exception as e:
             self.error = "error answer: " + str(e)
@@ -301,7 +300,7 @@ This result should be perfectly parsable by a JSON parser without errors.
         game_cache = next((v for k, v in self.active_games.items() if v.game_id == game_id), None)
         game = StorageIface(self.storage).view().get_game(game_id, "")
         if game_cache is not None:
-            game = game_cache.to_dict(False)    
+            game = game_cache.to_dict(False, gl.message_raw["datetime"])    
         try:
             if "error" in game:
                 raise Exception(game.get("error"))
@@ -333,8 +332,8 @@ def _select_game(game: dict[str, str], nicks: dict[str, str], sender_address: Ad
             "answered": str(any(isinstance(p, dict) and isinstance(p.get("address"), str) and p["address"].lower() == sender_address.as_hex.lower() for p in game.get("game_players", []))) 
         }
 
-def _check_speed_ratio(game: dict[str, str]) -> float:
-    return 1.0 - (time.time() - float(game.get("game_time"))) / (float(game.get("game_duration")) * 60)
+def _check_speed_ratio(game: dict[str, str], time_str: str) -> float:
+    return 1.0 - (float(_convert_time(time_str)) - float(game.get("game_time"))) / (float(game.get("game_duration")) * 60)
 
 def _parse_players(players: TreeMap[Address, Score], full: bool) -> dict:
     result = []
@@ -342,8 +341,12 @@ def _parse_players(players: TreeMap[Address, Score], full: bool) -> dict:
         result.append(score.to_dict(str(address.as_hex), full))
     return result
 
-def _check_time_due(game: Game) -> bool:
-    return time.time() - game.game_time >= game.game_duration * 60
+def _check_time_due(game: Game, time_str: str) -> bool:
+    return float(_convert_time(time_str)) - float(game.game_time) >= game.game_duration * 60
+
+def _convert_time(time_str: str) -> str:
+    dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+    return str(dt.timestamp())
 
 def _extract_json_from_string(s: str) -> str:
     """

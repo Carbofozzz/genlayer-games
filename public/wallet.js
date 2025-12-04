@@ -6,9 +6,10 @@ const WalletUI = (() => {
 
   let client = null;
   let inited = false;
-  let contractStat = '0xa5128Cc6bC90504A621dee971d978253677d3F7F';
-  let contractGuess = '0x7e7eaB74f2470B8701A4C2ef1E55c811Dd79563b';
-  let contractMatch = '0x646355170D06a3F310E70Eb68eC7c75Bc2993f6f';
+  let contractStat = '0x98e2797FB846fFf75BF5790681d52C80C1259e48';
+  let contractGuess = '0x5B46523CFba1D1a45De3A7b552b6Bc1a3e4e843e';
+  let contractMatch = '0xeC4611722b3BB8A9873E062Dc4c908b3Ea813Bd3';
+  let contractQuiz = '0x3265496Bc6a3D2dF70f9a9E7eCf85c33ee92f74b';
 
   const FLAG_KEY = 'answeredFlags';
 
@@ -170,6 +171,40 @@ const WalletUI = (() => {
     }
   }
 
+  async function getGameQuiz(gameId) {}
+
+  async function getMyQuiz() {
+    if (!client) return;
+    const submitOpenBtn = document.getElementById('openBtn');
+    const submitCloseBtn = document.getElementById('closeBtn');
+    const progress = document.getElementById('saveProgress');
+    if (submitOpenBtn) submitOpenBtn.classList.add('hidden');
+    if (submitCloseBtn) submitCloseBtn.classList.add('hidden');
+    if (progress) progress.classList.remove('hidden');
+    try {
+      const game = await client.readContract({
+        address: contractQuiz,
+        functionName: 'get_my_game',
+        args: [],
+      });
+      let res = JSON.parse(game);
+      if (submitOpenBtn) submitOpenBtn.classList.remove('hidden');
+      if (submitCloseBtn) submitCloseBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      if (res.error) {
+        renderQuizAdmin(null);
+      } else {
+        renderQuizAdmin(res);
+      }
+      console.error('Success getting my quiz:', res);
+    } catch (error) {
+      if (submitOpenBtn) submitOpenBtn.classList.remove('hidden');
+      if (submitCloseBtn) submitCloseBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      console.error('Error getting my quiz:', error);
+    }
+  }
+
   async function checkPage() {
     const pageName = document.body.dataset.pageName;
     switch (pageName) {
@@ -181,6 +216,12 @@ const WalletUI = (() => {
         break;
       case 'match':
         getGameMatch(document.body.dataset.gameId);
+        break;
+      case 'quiz':
+        getGameQuiz(document.body.dataset.gameId);
+        break;
+      case 'start_quiz':
+        getMyQuiz();
         break;
       case 'profile':
         getGames();
@@ -296,6 +337,41 @@ const WalletUI = (() => {
     }
   }
 
+  async function gameQuiz(gameTitle, gameLang, gameQty, gameUrl, gameWrong) {
+    if (!client) return;
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const submitOpenBtn = document.getElementById('openBtn');
+    const submitCloseBtn = document.getElementById('closeBtn');
+    const progress = document.getElementById('saveProgress');
+    if (submitOpenBtn) submitOpenBtn.classList.add('hidden');
+    if (submitCloseBtn) submitCloseBtn.classList.add('hidden');
+    if (progress) progress.classList.remove('hidden');
+    try {
+      const txHash = await client.writeContract({
+        address: contractQuiz,
+        functionName: "create_game",
+        args: [id, gameTitle, gameUrl, gameQty, gameWrong, gameLang],
+      });
+      console.error('Success tx quiz:', txHash);
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 100,
+        interval: 2000,
+      });
+      console.error('Success setting quiz:', receipt);
+      if (submitOpenBtn) submitOpenBtn.classList.remove('hidden');
+      if (submitCloseBtn) submitCloseBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      getMyQuiz();
+    } catch (error) {
+      console.error('Error setting quiz:', error);
+      if (submitOpenBtn) submitOpenBtn.classList.remove('hidden');
+      if (submitCloseBtn) submitCloseBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+    }
+  }
+
   async function gameMatch(theme) {
     if (!client) return;
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -363,6 +439,279 @@ const WalletUI = (() => {
       if (submitBtn) submitBtn.classList.remove('hidden');
       if (progress) progress.classList.add('hidden');
     }
+  }
+
+  async function delQuestion(id) {
+    try {
+      const txHash = await client.writeContract({
+        address: contractQuiz,
+        functionName: "delete_game_questions",
+        args: [[id]],
+      });
+      console.error('Success tx q del:', txHash);
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 100,
+        interval: 2000,
+      });
+      console.error('Success q del:', receipt);
+      getMyQuiz();
+    } catch (error) {
+      console.error('Error q del:', error);
+    }
+  }
+
+  async function editQuestion(id, val) {
+    try {
+      const txHash = await client.writeContract({
+        address: contractQuiz,
+        functionName: "edit_game_questions",
+        args: [id, val],
+      });
+      console.error('Success tx q edit:', txHash);
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 100,
+        interval: 2000,
+      });
+      console.error('Success q edit:', receipt);
+      getMyQuiz();
+    } catch (error) {
+      console.error('Error q edit:', error);
+    }
+  }
+
+  async function startQuiz(min) {
+    try {
+      const txHash = await client.writeContract({
+        address: contractQuiz,
+        functionName: "start_game",
+        args: [],
+      });
+      console.error('Success tx start:', txHash);
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 100,
+        interval: 2000,
+      });
+      console.error('Success start:', receipt);
+      getMyQuiz();
+    } catch (error) {
+      console.error('Error start:', error);
+    }
+  }
+
+  function renderQuizAdmin(quiz) {
+    const title = document.getElementById('game_title');
+    const submitOpenBtn = document.getElementById('openBtn');
+    const submitCloseBtn = document.getElementById('closeBtn');
+    const gameLinkP = document.getElementById('game_link_p');
+    const gameLink = document.getElementById('game_link');
+    if (gameLinkP) gameLinkP.classList.add('hidden');
+    if (title) title.value = "";
+    if (submitOpenBtn) submitOpenBtn.disabled = false;
+    if (submitCloseBtn) submitCloseBtn.disabled = false;
+    if (quiz) {
+      if (quiz.game_finished && quiz.game_finished === "False") {
+        if (title && quiz.game_title) title.value = quiz.game_title;
+        if (submitOpenBtn) submitOpenBtn.disabled = quiz.game_started && quiz.game_started === "True";
+        if (submitCloseBtn) submitCloseBtn.disabled = quiz.game_started && quiz.game_started === "True";
+        if (quiz.game_started && quiz.game_started === "True") {
+          if (gameLinkP) gameLinkP.classList.remove('hidden');
+          if (gameLink) gameLink.href = "/quiz/" + quiz.game_id
+        }
+      }
+    }
+    const root = document.getElementById('answers');
+    if (!root) return;
+    if (!quiz || !Array.isArray(quiz.game_questions) || quiz.game_questions.length === 0) {
+      root.textContent = '';
+      return;
+    }
+    if (quiz.game_finished && quiz.game_finished === "True") {
+      root.textContent = '';
+      return;
+    }
+
+    const questions = quiz.game_questions;
+    root.textContent = '';
+
+    const list = document.createElement('ol');
+    list.style.paddingLeft = '1.25rem';
+    list.style.margin = '1rem 0';
+    list.style.display = 'grid';
+    list.style.rowGap = '0.75rem';
+
+    questions.forEach((q, index) => {
+      const li = document.createElement('li');
+      li.style.listStyle = 'decimal';
+      li.style.padding = '0.75rem 0';
+      li.style.borderBottom = '1px solid #e5e7eb';
+
+      const topRow = document.createElement('div');
+      topRow.style.display = 'grid';
+      topRow.style.gridTemplateColumns = '1fr auto';
+      topRow.style.columnGap = '0.75rem';
+      topRow.style.alignItems = 'center';
+
+      const questionText = document.createElement('div');
+      questionText.textContent = q.question || `Question #${index + 1}`;
+      questionText.style.fontWeight = '600';
+      questionText.style.fontSize = '14px';
+
+      const btns = document.createElement('div');
+      btns.style.display = 'flex';
+      btns.style.gap = '0.5rem';
+
+      const deleteBtn = document.createElement('button');
+      const toggleBtn = document.createElement('button');
+
+      deleteBtn.type = 'button';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.className = 'btn';
+      deleteBtn.style.fontSize = '12px';
+
+      deleteBtn.addEventListener('click', () => {
+        console.log('Delete question', q.id);
+        deleteBtn.disabled = true;
+        toggleBtn.disabled = true;
+        delQuestion(q.id);
+      });
+
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'btn';
+      toggleBtn.style.fontSize = '12px';
+
+      const isClosed = String(q.closed) === 'True';
+      const answersArr = Array.isArray(q.answers) ? q.answers : [];
+
+      if (isClosed) {
+        toggleBtn.textContent = 'Make open-ended';
+        toggleBtn.addEventListener('click', () => {
+          console.log('Make question open', q.id);
+          deleteBtn.disabled = true;
+          toggleBtn.disabled = true;
+          editQuestion(q.id, true);
+        });
+      } else {
+        if (answersArr.length > 1) {
+          toggleBtn.textContent = 'Make closed';
+          toggleBtn.addEventListener('click', () => {
+            console.log('Make question closed', q.id);
+            deleteBtn.disabled = true;
+            toggleBtn.disabled = true;
+            editQuestion(q.id, false);
+          });
+        } else {
+          toggleBtn.textContent = 'Can\'t close (1 answer)';
+          toggleBtn.disabled = true;
+          toggleBtn.style.opacity = '0.6';
+          toggleBtn.style.cursor = 'default';
+        }
+      }
+
+      btns.appendChild(deleteBtn);
+      btns.appendChild(toggleBtn);
+
+      topRow.appendChild(questionText);
+      topRow.appendChild(btns);
+      li.appendChild(topRow);
+
+      const answersBlock = document.createElement('ul');
+      answersBlock.style.margin = '0.5rem 0 0';
+      answersBlock.style.paddingLeft = '1rem';
+
+      if (!isClosed) {
+        if (answersArr.length > 0) {
+          const example = answersArr[0];
+          const aLi = document.createElement('li');
+          aLi.textContent = example.answer || '';
+          aLi.style.fontSize = '13px';
+          aLi.style.color = '#4b5563';
+          answersBlock.appendChild(aLi);
+        } else {
+          const aLi = document.createElement('li');
+          aLi.textContent = 'No answer';
+          aLi.style.fontSize = '13px';
+          aLi.style.color = '#9ca3af';
+          answersBlock.appendChild(aLi);
+        }
+      } else {
+        const correctId = String(q.correct ?? '');
+        if (answersArr.length === 0) {
+          const aLi = document.createElement('li');
+          aLi.textContent = 'No answers';
+          aLi.style.fontSize = '13px';
+          aLi.style.color = '#9ca3af';
+          answersBlock.appendChild(aLi);
+        } else {
+          answersArr.forEach(ans => {
+            const aLi = document.createElement('li');
+            aLi.textContent = ans.answer || '';
+            aLi.style.fontSize = '13px';
+
+            const isCorrect = String(ans.id) === correctId;
+            if (isCorrect) {
+              aLi.style.color = '#111827';
+              aLi.style.fontWeight = '500';
+            } else {
+              aLi.style.color = '#dc2626';
+            }
+
+            answersBlock.appendChild(aLi);
+          });
+        }
+      }
+
+      li.appendChild(answersBlock);
+      list.appendChild(li);
+    });
+
+    root.appendChild(list);
+
+    const controlsRow = document.createElement('div');
+    controlsRow.style.display = 'flex';
+    controlsRow.style.gap = '0.5rem';
+    controlsRow.style.marginTop = '1rem';
+    controlsRow.style.alignItems = 'center';
+
+    const minutesInput = document.createElement('input');
+    minutesInput.type = 'number';
+    minutesInput.min = '1';
+    minutesInput.max = '10';
+    minutesInput.value = '1';
+    minutesInput.placeholder = 'Min. to start';
+    minutesInput.style.width = '120px';
+    minutesInput.style.padding = '8px';
+    minutesInput.style.border = '1px solid #e5e7eb';
+    minutesInput.style.borderRadius = '6px';
+    minutesInput.id = 'quizStartMinutes';
+    minutesInput.disabled = quiz.game_started && quiz.game_started === "True";
+
+    const startBtn = document.createElement('button');
+    startBtn.type = 'button';
+    startBtn.textContent = 'Start quiz';
+    startBtn.className = 'btn';
+    startBtn.style.padding = '8px 12px';
+    startBtn.disabled = quiz.game_started && quiz.game_started === "True";
+
+    controlsRow.appendChild(minutesInput);
+    controlsRow.appendChild(startBtn);
+    root.appendChild(controlsRow);
+
+    startBtn.addEventListener('click', async () => {
+      const mins = Number(minutesInput.value);
+      if (!Number.isFinite(mins) || mins < 0) {
+        alert('Please enter valid minutes (1 or greater).');
+        return;
+      }
+      startBtn.disabled = true;
+      minutesInput.disabled = true;
+      startQuiz(minutesInput.value);
+    });
   }
 
   function renderGame(state, game) {
@@ -801,6 +1150,7 @@ const WalletUI = (() => {
     answerMatch,
     gameGuess, 
     gameMatch,
+    gameQuiz,
     checkPage
   };
 })();

@@ -12,32 +12,58 @@
       }
       .wrap { max-width: 800px; margin: 0 auto; }
       h1 { margin: 0 0 1rem; }
-      canvas { touch-action: none; }
       .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
       .nav a { color: #0366d6; text-decoration: none; }
       .nav a.active { font-weight: 600; }
       .nav .links { display: flex; gap: .75rem; }
       .nav .wallet { display: flex; gap: .5rem; align-items: center; }
-      .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
-      .hidden { display: none !important; }
-      .row .spinner {
-        width: 20px;
-        height: 20px;
-        border: 2px solid #ddd;
-        border-top-color: #0366d6;
-        border-radius: 50%;
-        animation: spin .8s linear infinite;
+      .game-creation-links {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 1.5rem;
       }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
+      .game-creation-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem 1rem;
+        border: 2px solid #0366d6;
+        border-radius: 8px;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s ease-in-out;
+        text-align: center;
+      }
+      .game-creation-btn:hover {
+        background-color: #e0f2f7;
+        border-color: #0056b3;
+        cursor: pointer;
+      }
+      .game-creation-btn-icon {
+        display: block;
+        width: 100%;
+        max-height: 120px;
+        object-fit: contain;
+        object-position: center;
+        margin-bottom: 0.5rem;
+      }
+      @media (max-width: 420px) {
+        .game-creation-links { grid-template-columns: 1fr; }
+        .game-creation-btn-icon { width: 80px; height: 80px; }
+      }
+      .game-creation-btn-title {
+        font-weight: 600;
+        font-size: 1.2rem;
+        color: #333;
       }
     </style>
   </head>
   <body>
     <div class="nav">
       <div class="links">
-        <a href="/" class="active">GuessPicture</a>
-        <a href="/draw-match">DrawMatch</a>
+        <a href="/" class="active">New Game</a>
         <a href="/leaderboard">Leaderboard</a>
         <a href="/rules">Rules</a>
       </div>
@@ -47,71 +73,25 @@
       </div>
     </div>
     <div class="wrap">
-      <h1>Create a GuessPicture game</h1>
-      <p>Draw with your mouse and start the game.</p>
-      <div style="border:1px solid #ddd; border-radius:8px; overflow:hidden; width:100%; max-width:600px;">
-        <canvas id="canvas" style="display:block; width:100%; height:450px; background:#fff;"></canvas>
-      </div>
-      <div class="row" style="margin-top:1rem; display:flex; gap:.5rem; flex-wrap: wrap;">
-        <button id="clearBtn" class="btn">Clear</button>
-        <button id="saveBtn" class="btn">Create game</button>
-        <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
+      <h1>Choose a Game to Create</h1>
+      <div class="game-creation-links">
+        <a href="/guess" class="game-creation-btn">
+          <img src="/gp.png" class="game-creation-btn-icon"/>
+          <span class="game-creation-btn-title">GuessPicture</span>
+        </a>
+        <a href="/draw-match" class="game-creation-btn">
+          <img src="/dm.png" class="game-creation-btn-icon"/>
+          <span class="game-creation-btn-title">DrawMatch</span>
+        </a>
+<!---        <a href="/" class="game-creation-btn">
+          <img src="/aq.png" class="game-creation-btn-icon"/>
+          <span class="game-creation-btn-title">AiQuiz</span>
+        </a>
+        <a href="/" class="game-creation-btn" disabled>
+          <span class="game-creation-btn-title">Coming Soon</span>
+        </a> -->
       </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/signature_pad@5.1.1/dist/signature_pad.umd.min.js"></script>
     <script type="module" src="/wallet.js"></script>
-    <script>
-      const canvas = document.getElementById('canvas');
-      const clearBtn = document.getElementById('clearBtn');
-      const submitBtn = document.getElementById('saveBtn');
-      const progress = document.getElementById('saveProgress');
-
-      function resizeCanvas() {
-        const ratio = Math.max(window.devicePixelRatio || 1, 1);
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * ratio;
-        canvas.height = 450 * ratio;
-        const ctx = canvas.getContext('2d');
-        ctx.scale(ratio, ratio);
-      }
-      resizeCanvas();
-      window.addEventListener('resize', resizeCanvas);
-
-      const signaturePad = new SignaturePad(canvas, { minWidth: 1.5, maxWidth: 3, penColor: 'black' });
-
-      clearBtn.addEventListener('click', async () => {
-        signaturePad.clear();
-      });
-
-      submitBtn.addEventListener('click', async () => {
-        if (signaturePad.isEmpty()) {
-          alert('Please draw something first');
-          return;
-        }
-        try {
-          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
-        } catch (e) { alert(e.message); return; }
-        clearBtn.classList.add('hidden');
-        submitBtn.classList.add('hidden');
-        progress.classList.remove('hidden');
-        const dataUrl = signaturePad.toDataURL('image/png');
-        try {
-          const res = await fetch('/api/signature', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dataUrl })
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || 'Save failed');
-          console.log("Picture ", json)
-          WalletUI.gameGuess(json.id, json.url)
-        } catch (e) {
-          alert(e.message);
-          clearBtn.classList.remove('hidden');
-          submitBtn.classList.remove('hidden');
-          progress.classList.add('hidden');
-        }
-      });
-    </script>
   </body>
 </html>

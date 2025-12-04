@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AiQuiz - a game powered by the GenLayer intelligent contract</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+      .wrap { max-width: 800px; margin: 0 auto; }
+      h1 { margin: 0 0 1rem; }
+      code { background: #f2f2f2; padding: .2rem .4rem; border-radius: 4px; }
+      .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .nav a { color: #0366d6; text-decoration: none; }
+      .nav a.active { font-weight: 600; }
+      .quiz a { color: #0366d6; text-decoration: none; }
+      .nav .links { display: flex; gap: .75rem; }
+      .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+      .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+      .hidden { display: none !important; }
+      .theme {
+        display: grid;
+        grid-auto-rows: auto;
+        row-gap: .75rem;
+        margin-top: 1rem;
+      }
+      .in_row {
+        display: grid;
+        grid-template-columns: 1fr 260px;
+        column-gap: .75rem;
+        align-items: end;
+        margin-top: .5rem;
+      }
+      .in_column,
+      .in_column_end {
+        min-width: 0;
+      }
+      .in_column label,
+      .in_column_end label {
+        display: block;
+        font-size: 12px;
+        color: #808080;
+        margin-bottom: .5rem;
+      }
+      .theme input,
+      .theme select {
+        width: 100%;
+        padding: .6rem .7rem;
+        font: inherit;
+        font-size: 14px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-sizing: border-box;
+      }
+      .theme .row {
+        display: flex;
+        gap: .5rem;
+        justify-content: flex-start;
+        padding-top: .25rem;
+      }
+      @media (max-width: 640px) {
+        .in_row {
+      grid-template-columns: 1fr;
+      row-gap: .5rem;
+        }
+      }
+      .theme .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-top-color: #0366d6;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body data-page-name="start_quiz">
+    <div class="nav">
+      <div class="links">
+        <a href="/">New Game</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/rules">Rules</a>
+      </div>
+      <div class="wallet">
+        <a href="/me"><span id="addr" style="opacity:.8"></span></a>
+        <button id="connectBtn" class="btn">Connect wallet</button>
+      </div>
+    </div>
+    <div class="wrap">
+      <h1>Create a AiQuiz game</h1>
+      <div class="theme">
+        <div class="in_row">
+          <div class="in_column">
+            <label for="game_title">Set a quiz title:</label>
+            <input type="text" id="game_title" placeholder="Type quiz title..." maxlength="20"/>
+          </div>
+          <div class="in_column_end">
+            <label for="languageSelect">Select a language:</label>
+            <select id="languageSelect" aria-label="Quiz language"></select>
+          </div>
+        </div>
+        <div class="in_row">
+          <div class="in_column">
+            <label for="src">Set a source article url:</label>
+            <input type="text" id="src" placeholder="Type article url..."/>
+          </div>
+          <div class="in_column_end">
+            <label for="qty">Set question quantity:</label>
+            <input type="number" id="qty" placeholder="Question quantity" max="20" min="1" value="2"/>
+          </div>
+        </div> 
+        <div class="row">
+          <button id="openBtn" class="btn">Open-ended questions</button>
+          <button id="closeBtn" class="btn">Closed questions</button>
+          <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
+        </div>
+        <p id="game_link_p" class="quiz hidden"><a id="game_link" href="">The Quiz page</a></p>
+        <div id="answers">
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/wallet.js"></script>
+    <script>
+      const title = document.getElementById('game_title');
+      const qty = document.getElementById('qty');
+      const article = document.getElementById('src');
+      const select = document.getElementById('languageSelect');
+      const submitOpenBtn = document.getElementById('openBtn');
+      const submitCloseBtn = document.getElementById('closeBtn');
+      if (submitOpenBtn) submitOpenBtn.addEventListener('click', async () => {
+        try {
+          if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+          const gameUrl = (article && article.value || '').trim();
+          const gameTitle = (title && title.value || '').trim();
+          const gameQty = (qty && qty.value || '').trim();
+          const gameLang = languages.find(l => l.code === select.value)?.name || select.value;
+          if (!gameUrl) { alert('Please enter an url'); return; }
+          //try {
+          //    const res = await fetch('/api/quiz', {
+          //    method: 'POST',
+          //    headers: { 'Content-Type': 'application/json' },
+          //    body: JSON.stringify({ answer_id: "1", answer: value })
+          //  });
+          //  const json = await res.json();
+           // if (!res.ok) throw new Error(json.error || 'Save failed');
+          //  console.log("Encode ", json)
+          //} catch (e) {
+          //}
+          WalletUI.gameQuiz(gameTitle, gameLang, gameQty, gameUrl, false);
+        } catch(e) { alert(e.message); }
+      });
+      if (submitCloseBtn) submitCloseBtn.addEventListener('click', async () => {
+        try {
+          if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+          const gameUrl = (article && article.value || '').trim();
+          const gameTitle = (title && title.value || '').trim();
+          const gameQty = (qty && qty.value || '').trim();
+          const gameLang = languages.find(l => l.code === select.value)?.name || select.value;
+          console.log("lang " + gameLang);
+          if (!gameUrl) { alert('Please enter an url'); return; }
+          WalletUI.gameQuiz(gameTitle, gameLang, gameQty, gameUrl, true);
+        } catch(e) { alert(e.message); }
+      });
+      const languages = [
+        { code: "en", name: "English" },
+        { code: "es", name: "Spanish" },
+        { code: "fr", name: "French" },
+        { code: "de", name: "German" },
+        { code: "it", name: "Italian" },
+        { code: "pt", name: "Portuguese" },
+        { code: "ru", name: "Russian" },
+        { code: "zh", name: "Chinese" },
+        { code: "ja", name: "Japanese" },
+        { code: "ko", name: "Korean" },
+        { code: "ar", name: "Arabic" },
+        { code: "hi", name: "Hindi" },
+        { code: "tr", name: "Turkish" },
+        { code: "vi", name: "Vietnamese" },
+        { code: "fa", name: "Persian" },
+        { code: "pl", name: "Polish" },
+        { code: "uk", name: "Ukrainian" },
+        { code: "nl", name: "Dutch" },
+        { code: "sv", name: "Swedish" },
+        { code: "no", name: "Norwegian" },
+        { code: "da", name: "Danish" },
+        { code: "fi", name: "Finnish" },
+        { code: "cs", name: "Czech" },
+        { code: "sk", name: "Slovak" },
+        { code: "ro", name: "Romanian" },
+        { code: "el", name: "Greek" },
+        { code: "he", name: "Hebrew" },
+        { code: "th", name: "Thai" },
+        { code: "id", name: "Indonesian" },
+        { code: "sr", name: "Serbian" },
+        { code: "hr", name: "Croatian" },
+        { code: "bg", name: "Bulgarian" },
+        { code: "hu", name: "Hungarian" },
+        { code: "lt", name: "Lithuanian" },
+        { code: "lv", name: "Latvian" },
+        { code: "et", name: "Estonian" },
+        { code: "sl", name: "Slovenian" },
+        { code: "is", name: "Icelandic" },
+        { code: "ga", name: "Irish" },
+        { code: "mt", name: "Maltese" },
+        { code: "sq", name: "Albanian" },
+        { code: "mk", name: "Macedonian" },
+        { code: "bs", name: "Bosnian" },
+        { code: "mn", name: "Mongolian" },
+        { code: "ka", name: "Georgian" },
+        { code: "hy", name: "Armenian" },
+        { code: "az", name: "Azerbaijani" },
+        { code: "kk", name: "Kazakh" },
+        { code: "uz", name: "Uzbek" },
+        { code: "tg", name: "Tajik" },
+        { code: "tk", name: "Turkmen" }
+      ];
+
+      const LANG_STORAGE_KEY = 'quiz_lang';
+
+      function populateLanguages(list) {
+        select.innerHTML = '';
+        const frag = document.createDocumentFragment();
+        list.forEach(({ code, name }) => {
+          const opt = document.createElement('option');
+          opt.value = code;
+          opt.textContent = name;
+          frag.appendChild(opt);
+        });
+        select.appendChild(frag);
+      }
+
+      function getBrowserIso() {
+        const nav = navigator.language || navigator.userLanguage;
+        return (nav && nav.split('-')[0]) || 'en';
+      }
+
+      function getStoredLang() {
+        try { return localStorage.getItem(LANG_STORAGE_KEY) || ''; } catch { return ''; }
+      }
+
+      function setStoredLang(code) {
+        try { localStorage.setItem(LANG_STORAGE_KEY, code); } catch {}
+      }
+
+      function initLanguageSelector() {
+        populateLanguages(languages);
+
+        const stored = getStoredLang();
+        const browserIso = getBrowserIso();
+        const preferred = stored || browserIso;
+        const found = languages.find(l => l.code === preferred) || languages.find(l => l.code === 'en');
+
+        if (found) select.value = found.code;
+
+        select.addEventListener('change', () => {
+          const code = select.value;
+          setStoredLang(code);
+        });
+
+        setStoredLang(select.value);
+      }
+
+      function getSelectedLangCode() {
+        return select.value;
+      }
+
+      function getSelectedLangName() {
+        return languages.find(l => l.code === select.value)?.name || '';
+      }
+
+      initLanguageSelector();
+    </script>
+  </body>
+</html>
