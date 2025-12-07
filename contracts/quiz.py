@@ -29,11 +29,14 @@ class StorageIface:
 @allow_storage
 @dataclass
 class Score:
-    score: u256
-    answers: TreeMap[str, str]
+    score_value: u256
+    score_answers: str
+
+    def __init__(self, score_value: int):
+        self.score_value = score_value
 
     def to_dict(self, address: str):
-        return {"score": str(self.score), "answers": _parse_answers(self.answers), "address": address}
+        return {"score": str(self.score_value), "answers": self.score_answers, "address": address}
 
 @allow_storage
 @dataclass
@@ -79,6 +82,7 @@ class Game:
     game_started: bool
     game_title: str
     game_questions: TreeMap[str, Question]
+    game_milestones: TreeMap[str, str]
     game_players: TreeMap[Address, Score]
 
     def __init__(self, game_id: str, game_creator: Address):
@@ -97,7 +101,7 @@ class Game:
                     "game_started": str(True), 
                     "game_title": str(self.game_title), 
                     "game_players": _parse_players(self.game_players),
-                    "game_state": _render_game_state(self.game_questions, self.game_start_time, start_time)
+                    "game_state": _render_game_state(self.game_questions, self.game_milestones, self.game_start_time, start_time)
                 }
             else:
                 return {
@@ -131,12 +135,13 @@ class AiQuiz(gl.Contract):
     storage: Address
     active_games: TreeMap[Address, Game]
 
-    def __init__(self, stat_contract: str):
+    def __init__(self, stat_contract: str, storage_contract: str):
         self.game_coeff = 50
         self.error = "None"
         self.secret = ""
         self.owner = gl.message.sender_address
         self.stat = Address(stat_contract)
+        self.storage = Address(storage_contract)
 
     @gl.public.write
     def add_secret(self, new_secret: str):
@@ -166,7 +171,7 @@ class AiQuiz(gl.Contract):
         self.game_coeff = coeff
 
     @gl.public.write
-    def start_game(self) -> None:
+    def start_game(self, minites_to_start: int) -> None:
         sender_address = gl.message.sender_address
         game_cache = self.active_games.get(sender_address)
         if game_cache is None:
@@ -175,10 +180,18 @@ class AiQuiz(gl.Contract):
             raise Exception("You have already started this game")
         if game_cache is not None and len(game_cache.game_questions) == 0:
             raise Exception("You have no questions this game")
+        game_cache.game_start_time = _convert_time(gl.message_raw["datetime"], minites_to_start * 60)
         game_cache.game_duration = str(_calculate_game_duration(game_cache.game_questions))
+        time_result = 0
+        for q_id, q in game_cache.game_questions.items():
+            if q.question_closed:
+                time_result += 20
+            else:
+                time_result += 60
+            game_cache.game_milestones[q_id] = str(float(game_cache.game_start_time) + time_result)
+        game_cache.game_milestones["scoring"] = str(float(game_cache.game_start_time) + time_result + 180)
         game_cache.game_started = True
-        game_cache.game_start_time = _convert_time(gl.message_raw["datetime"], 60)
-        # StatIface(self.stat).emit().add_game_to_archive(sender_address.as_hex, game_cache.game_id, True, str(game_cache.game_start_time), 3)
+        StatIface(self.stat).emit().add_game_to_archive(sender_address.as_hex, game_cache.game_id, True, str(game_cache.game_start_time), 3)
 
     @gl.public.write
     def delete_game_questions(self, to_delete: list[str]) -> None:
@@ -211,12 +224,67 @@ class AiQuiz(gl.Contract):
         if game_cache is None:
             raise Exception("Game not found")
         if game_cache.game_started == False:
-            raise Exception("Game not started")
+            raise Exception("Game has not started")
         if not _check_time_scoring(game_cache, gl.message_raw["datetime"]):
-            raise Exception("Game not scoring")
+            raise Exception("Game are not scoring")
+        if sender_address in game_cache.game_players:
+            raise Exception("You have been already scored")
+        if sender_address == game_cache.game_creator:
+            raise Exception("Creator cannot play")
+
+        decrypted = []
         for answer in answers:
-            a = 2
-            
+            decrypted.append(self.decrypt(answer, self.secret))
+        try:
+            score = 0
+            for d in decrypted:
+                dj = json.loads(d)
+                qId = dj.get("question_id")
+                q = game_cache.game_questions[qId]
+                q_time_end = float(game_cache.game_milestones[qId])
+                aId = dj.get("answer_id")
+                q_time_fact = int(dj.get("ts")) / 1000.0
+                if q.question_closed:
+                    if aId == str(q.question_correct_answer):
+                        if q_time_end > q_time_fact:
+                            q_score = 500 * ((q_time_end - q_time_fact) / 20.0)
+                            score += q_score
+                else:
+                    good = q.question_answers[q.question_correct_answer]
+                    user = dj.get("answer")
+                    def non_det():
+                        compare_prompt = f"""
+Compare these two texts—the correct one {good} and the user's answer {user}. 
+Assess how closely the user's answer matches the correct one, based on text quality and semantic consistency. 
+Give a consolidated rating from 0 to 10, where 0 is a completely inadequate answer and 10 is a completely identical answer.
+Return a JSON with the name as follows
+{{
+    "rating": str,
+}}
+It is mandatory that you respond only using the JSON format above,
+nothing else. Don't include any other words or characters,
+your output must be only JSON without any formatting prefix or suffix.
+This result should be perfectly parsable by a JSON parser without errors.
+                        """
+                        result = gl.nondet.exec_prompt(compare_prompt)
+                        return int(json.loads(_extract_json_from_string(result)).get("rating", "0"))
+                    ai_score = gl.eq_principle.prompt_comparative(non_det, "The result must not differ by more than 20%")
+                    if q_time_end > q_time_fact:
+                        t0 = 40.0
+                        t_max = 60.0
+                        k_min = 0.3
+                        t = q_time_end - q_time_fact
+                        t_eff = min(max(t, t0), t_max)  
+                        k = 1.0 - (1.0 - k_min) * ((t_eff - t0) / (t_max - t0))
+                        q_score = 1000 * (ai_score / 10.0) * k
+                        score += q_score
+            score_item = Score(score_value=int(score))
+            score_item.score_answers = str(decrypted)
+            game_cache.game_players[sender_address] = score_item
+            StatIface(self.stat).emit().add_user_points_game_to_archive(sender_address.as_hex, game_id, game_cache.game_start_time, 3, 0)
+            self.error = str(score)
+        except Exception as e:
+            self.error = str(e)
 
     @gl.public.write
     def create_game(self, potential_game_id: str, title: str, web_link: str, qty: str, wrong_options: bool, lang: str) -> None:
@@ -229,8 +297,15 @@ class AiQuiz(gl.Contract):
             raise Exception("You have an unfinished game")
         if game_cache is not None and game_cache.game_started == True:
             new_game = True
-            # StorageIface(self.storage).emit().add_game(game_cache.to_dict(True, time_str))
+            StorageIface(self.storage).emit().add_game(game_cache.to_dict(True, time_str))
 
+        rngSrc = make_rng_from_inputs(
+            sender_address=sender_address,
+            potential_game_id=potential_game_id,
+            title=title,
+            web_link=web_link,
+            time_str=time_str,
+        )       
         def leader_fn():
             web_data = gl.nondet.web.render(web_link, mode = "text")
             if wrong_options:
@@ -317,7 +392,7 @@ This result should be perfectly parsable by a JSON parser without errors.
         quiz = gl.vm.run_nondet(leader_fn, validator_fn)
         logs = []
 
-        def set_questions(g: Game):
+        def set_questions(g: Game, rng: random.Random):
             for item in json.loads(quiz):
                 a_list = []
                 a_list.append(item.get("answer"))
@@ -330,7 +405,7 @@ This result should be perfectly parsable by a JSON parser without errors.
                 w3 = item.get("wrong_answer_3")
                 if w3:
                     a_list.append(w3)
-                random.shuffle(a_list)
+                rng.shuffle(a_list)
                 answers = TreeMap()
                 correct = 1
                 for index, a_list_item in enumerate(a_list, start=1):
@@ -350,14 +425,14 @@ This result should be perfectly parsable by a JSON parser without errors.
         
         if not new_game:
             game_cache.game_title=title
-            set_questions(game_cache)
+            set_questions(game_cache, rngSrc)
         else:
             game = Game(
                 game_id=potential_game_id,
                 game_creator=sender_address,
             )
             game.game_title=title
-            set_questions(game)
+            set_questions(game, rngSrc)
             self.active_games[sender_address] = game
 
         self.error = str(logs)
@@ -370,11 +445,9 @@ This result should be perfectly parsable by a JSON parser without errors.
     def get_game(self, game_id: str) -> dict:
         try:
             game_cache = next((v for k, v in self.active_games.items() if v.game_id == game_id), None)
-            "game = StorageIface(self.storage).view().get_game(game_id, "")"
-            game = {}
+            game = StorageIface(self.storage).view().get_game(game_id)
             if game_cache is not None:
                 game = game_cache.to_dict(gl.message.sender_address == game_cache.game_creator, gl.message_raw["datetime"])  
-        
             if "error" in game:
                 raise Exception(game.get("error"))
             nicknames = StatIface(self.stat).view().get_nicknames()
@@ -400,7 +473,7 @@ This result should be perfectly parsable by a JSON parser without errors.
         return self.error
 
     @gl.public.view
-    def encrypt(self, token: str, password: str) -> str:
+    def decrypt(self, token: str, password: str) -> str:
         try:
             data = base64.b64decode(token)
             if len(data) < 16:
@@ -428,27 +501,26 @@ def _select_game(game: dict[str, str], nicks: dict[str, str]) -> dict:
         pl["nick"] = nicks.get(pl.get("address"), "")
     return game
 
-def _render_game_state(questions: TreeMap[str, Question], start: str, time_str: str) -> dict:
+def _render_game_state(questions: TreeMap[str, Question], milestones: TreeMap[str, str], start: str, time_str: str) -> dict:
     time_passed = float(_convert_time(time_str, 0)) - float(start)
     if time_passed < 0:
         return { "state": "waiting" }
     if time_passed < _calculate_game_duration(questions):
+        aq = _get_active_question(questions, milestones, time_passed)
         return { 
             "state": "quiz",
-            "question": _get_active_question(questions, time_passed)
+            "question": aq.get("q"),
+            "finish_time": aq.get("t")
         }
-    return { "state": "scoring" }
+    return { 
+        "state": "scoring",
+        "finish_time": milestones["scoring"]
+    }
 
 def _parse_questions(questions: TreeMap[str, Question], admin: bool) -> dict:
     result = []
     for q_id, q in questions.items():
         result.append(q.to_dict(admin))
-    return result
-
-def _parse_answers(answers: TreeMap[str, str]) -> dict:
-    result = []
-    for a_id, a in answers.items():
-        result.append({ "question_id": a_id, "answer": a })
     return result
 
 def _parse_players(players: TreeMap[Address, Score]) -> dict:
@@ -473,7 +545,17 @@ def _calculate_game_duration(questions: TreeMap[str, Question]) -> float:
             result += 60
     return result
 
-def _get_active_question(questions: TreeMap[str, Question], time: float) -> dict:
+def make_rng_from_inputs(sender_address: str,
+                         potential_game_id: str,
+                         title: str,
+                         web_link: str,
+                         time_str: str) -> random.Random:
+    seed_str = f"{sender_address}|{potential_game_id}|{title}|{web_link}|{time_str}"
+    h = hashlib.sha256(seed_str.encode("utf-8")).hexdigest()
+    seed_int = int(h, 16)
+    return random.Random(seed_int)
+
+def _get_active_question(questions: TreeMap[str, Question], milestones: TreeMap[str, str], time: float) -> dict:
     result = time
     for q_id, q in questions.items():
         if q.question_closed:
@@ -481,7 +563,7 @@ def _get_active_question(questions: TreeMap[str, Question], time: float) -> dict
         else:
             result -= 60
         if result < 0:
-            return q.to_dict(False)
+            return { "q": q.to_dict(False), "t":  milestones[q_id] }
     return {}
 
 def _convert_time(time_str: str, gap: int) -> str:

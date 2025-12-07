@@ -15,6 +15,8 @@
       .nav .links { display: flex; gap: .75rem; }
       .nav .wallet { display: flex; gap: .5rem; align-items: center; }
       .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+      .lb-tab { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+      .lb-tab-active { background: #e5efff; border-color: #9cb8ff; font-weight: 600; }
     </style>
   </head>
   <body data-page-name="leaderboard">
@@ -31,7 +33,16 @@
     </div>
     <div class="wrap">
       <h1>Leaderboard</h1>
-      <div id="leaderboard" />
+      <div id="lbTabs" style="margin: 1rem 0; border-bottom: 1px solid #e5e7eb; display:flex; gap:.75rem;">
+        <button class="btn lb-tab lb-tab-active" data-tab="overall">Overall</button>
+        <button class="btn lb-tab" data-tab="guess">GuessPicture</button>
+        <button class="btn lb-tab" data-tab="match">DrawMatch</button>
+      </div>
+    
+      <div id="leaderboard-overall"></div>
+      <div id="leaderboard-guess" style="display:none;"></div>
+      <div id="leaderboard-match" style="display:none;"></div>
+      <div id="leaderboard-quiz" style="display:none;"></div>
     </div>
     <script type="module" src="/wallet.js"></script>
   </body>

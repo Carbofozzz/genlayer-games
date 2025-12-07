@@ -97,9 +97,9 @@ app.post('/api/signature', async (req, res) => {
 
 app.post('/api/quiz', async (req, res) => {
   try {
-    const { answer_id, answer } = req.body || {};
+    const { question_id, answer_id, answer } = req.body || {};
     if (typeof answer !== 'string') return res.status(400).json({ error: 'Invalid answer' });
-    const payload = { answer_id: answer_id || null, answer: answer, ts: Date.now() };
+    const payload = { question_id: question_id || null, answer_id: answer_id || null, answer: answer, ts: Date.now() };
     const sealed = sealAnswerPlain(payload);
     return res.json({ sealed });
   } catch (e) {
@@ -136,9 +136,9 @@ app.get('/draw-match', (_req, res) => {
 app.get('/quiz/:id', async (req, res) => {
   try {
     res.set('Content-Type', 'text/html; charset=utf-8');
-    return res.send("");
-  } catch {
-    return res.status(500).send('Failed to load game');
+    return res.send(getQuizPage(req));
+  } catch(e) {
+    return res.status(500).send('Failed to load game', e);
   }
 });
 
@@ -167,6 +167,110 @@ app.get('/', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });
+
+function getQuizPage(req) {
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>AiQuiz Id: ${req.params.id}</title>
+      <style>
+        #loadingIndicator {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 10px;
+          background-color: rgba(255, 255, 255, 0.8);
+          z-index: 1000;
+          pointer-events: none;
+        }
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+        .wrap { max-width: 800px; margin: 0 auto; }
+        img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; }
+        a { color: #0366d6; text-decoration: none; }
+        .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+        .nav a { color: #0366d6; text-decoration: none; }
+        .nav a.active { font-weight: 600; }
+        .nav .links { display: flex; gap: .75rem; }
+        .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+        .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+        .btn-selected { background-color: #4caf50; color: #fff; }
+        .answer { margin-top: 1rem; }
+        .answer input { width: 100%; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
+        .answer .row { margin-top: .5rem; display: flex; gap: .5rem; }
+        .hidden { display: none !important; }
+        .spinner {
+          border: 4px solid #f3f3f3; /* Light grey */
+          border-top: 4px solid #3498db; /* Blue */
+          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .row .spinner2 {
+          width: 20px;
+          height: 20px;
+          border: 2px solid #ddd;
+          border-top-color: #0366d6;
+          border-radius: 50%;
+          animation: spin .8s linear infinite;
+        }
+      </style>
+    </head>
+    <body data-page-name="quiz" data-game-id="${req.params.id}">
+      <div class="nav">
+        <div class="links">
+          <a href="/">New Game</a>
+          <a href="/leaderboard">Leaderboard</a>
+          <a href="/rules">Rules</a>
+        </div>
+        <div class="wallet">
+           <a href="/me"><span id="addr" style="opacity:.8"></span></a>
+          <button id="connectBtn" class="btn">Connect wallet</button>
+        </div>
+      </div>
+      <div class="wrap">
+        <h1 id="quiz_title">AiQuiz</h1>
+        <div id="logoutContainer" class="hidden">
+          <p>Please connect your wallet first</p>
+        </div>
+        <div id="loginContainer" class="hidden">
+          <div id="emptyContainer" class="hidden">
+            <p>Game not found</p>
+            <p>If the game was created recently, try refreshing the page.</p>
+            <button id="refresh" class="btn" style="margin-top:1rem;">Refresh</button>
+          </div>
+          <div id="loadingIndicator" class="hidden">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+          </div>
+          <div id="gameContainer" class="hidden">
+            <div id="stateContainer" class="hidden">
+            </div>
+            <div id="resultContainer" class="hidden">
+            </div>
+          </div>
+        </div>  
+      </div>
+      <script type="module" src="/wallet.js"></script>
+      <script>
+        const refreshBtn = document.getElementById('refresh');
+        if (refreshBtn) refreshBtn.addEventListener('click', async () => {
+          try {
+            if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+            WalletUI.checkPage();
+          } catch(e) { alert(e.message); }
+        });
+      </script>
+    </body>
+  </html>`
+}
 
 function getGuessPage(req, type, mode) {
   return `<!doctype html>
