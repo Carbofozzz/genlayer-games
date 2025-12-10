@@ -129,6 +129,10 @@ app.get('/quiz', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/quiz.html'));
 });
 
+app.get('/punch', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/punch.html'));
+});
+
 app.get('/draw-match', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/match.html'));
 });
@@ -137,6 +141,15 @@ app.get('/quiz/:id', async (req, res) => {
   try {
     res.set('Content-Type', 'text/html; charset=utf-8');
     return res.send(getQuizPage(req));
+  } catch(e) {
+    return res.status(500).send('Failed to load game', e);
+  }
+});
+
+app.get('/punch/:id', async (req, res) => {
+  try {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    return res.send(getPunchPage(req));
   } catch(e) {
     return res.status(500).send('Failed to load game', e);
   }
@@ -167,6 +180,133 @@ app.get('/', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });
+
+function getPunchPage(req) {
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>PunchLine Id: ${req.params.id}</title>
+      <style>
+        #loadingIndicator {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 10px;
+          background-color: rgba(255, 255, 255, 0.8);
+          z-index: 1000;
+          pointer-events: none;
+        }
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+        .wrap { max-width: 800px; margin: 0 auto; }
+        a { color: #0366d6; text-decoration: none; }
+        .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+        .nav a { color: #0366d6; text-decoration: none; }
+        .nav a.active { font-weight: 600; }
+        .nav .links { display: flex; gap: .75rem; }
+        .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+        .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+        .answer { margin-top: 1rem; }
+        .answer textarea { width: 100%; height: 200px; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
+        .answer .row { margin-top: .5rem; display: flex; gap: .5rem; }
+        .hidden { display: none !important; }
+        .spinner {
+          border: 4px solid #f3f3f3; /* Light grey */
+          border-top: 4px solid #3498db; /* Blue */
+          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .row .spinner2 {
+          width: 20px;
+          height: 20px;
+          border: 2px solid #ddd;
+          border-top-color: #0366d6;
+          border-radius: 50%;
+          animation: spin .8s linear infinite;
+        }
+      </style>
+    </head>
+    <body data-page-name="punch" data-game-id="${req.params.id}">
+      <div class="nav">
+        <div class="links">
+          <a href="/">New Game</a>
+          <a href="/leaderboard">Leaderboard</a>
+          <a href="/rules">Rules</a>
+        </div>
+        <div class="wallet">
+           <a href="/me"><span id="addr" style="opacity:.8"></span></a>
+          <button id="connectBtn" class="btn">Connect wallet</button>
+        </div>
+      </div>
+      <div class="wrap">
+        <h1>PunchLine Id: ${req.params.id}</h1>
+        <div id="logoutContainer" class="hidden">
+          <p>Please connect your wallet first</p>
+        </div>
+        <div id="loginContainer" class="hidden">
+          <div id="emptyContainer" class="hidden">
+            <p>Game not found</p>
+            <p>If the game was created recently, try refreshing the page.</p>
+            <button id="refresh" class="btn" style="margin-top:1rem;">Refresh</button>
+          </div>
+          <div id="loadingIndicator" class="hidden">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+          </div>
+          <div id="gameContainer" class="hidden">
+            <h2 id="game_theme"></h2>
+            <div id="timer" class="hidden">
+            </div>
+            <div id="task" class="hidden">
+            </div>
+            <div id="players" class="hidden">
+            </div>
+            <div id="answers" class="answer" style="display:none;">
+              <label for="answer" style="display:block; margin-bottom:.5rem;">Come up with a punchline</label>
+              <textarea id="answer" placeholder="Type your joke..."></textarea>
+              <div class="row">
+                <button id="clearAnswer" class="btn" type="button">Clear</button>
+                <button id="submitAnswer" class="btn" type="button">Submit answer</button>
+                <div id="answerProgress" class="spinner2 hidden" aria-label="Loading"></div>
+              </div>
+            </div>
+          </div>
+        </div>  
+      </div>
+      <script type="module" src="/wallet.js"></script>
+      <script>
+        const area = document.getElementById('answer');
+        const clearBtn = document.getElementById('clearAnswer');
+        const colorButtons = document.querySelectorAll('.color-btn');
+        const submitBtn = document.getElementById('submitAnswer');
+        const refreshBtn = document.getElementById('refresh');
+        if (clearBtn) clearBtn.addEventListener('click', () => { if (area) area.value=''; });
+        if (submitBtn) submitBtn.addEventListener('click', async () => {
+          try {
+            if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+            const value = (area && area.value || '').trim();
+            if (!value) { alert('Please enter a punch line'); return; }
+            WalletUI.joke(value);
+          } catch(e) { alert(e.message); }
+        });
+        if (refreshBtn) refreshBtn.addEventListener('click', async () => {
+          try {
+            if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+            WalletUI.checkPage();
+          } catch(e) { alert(e.message); }
+        });
+      </script>
+    </body>
+  </html>`
+}
 
 function getQuizPage(req) {
   return `<!doctype html>
@@ -325,6 +465,25 @@ function getGuessPage(req, type, mode) {
         border-radius: 50%;
         animation: spin .8s linear infinite;
       }
+      .colors {
+        margin-top: .75rem;
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .color-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 2px solid #ccc;
+        cursor: pointer;
+        box-sizing: border-box;
+      }
+      .color-btn.active {
+        border-color: #000;
+        box-shadow: 0 0 0 2px rgba(0,0,0,.15);
+      }
     </style>
   </head>
   <body data-page-name="${mode}" data-game-id="${req.params.id}">
@@ -361,6 +520,18 @@ function getGuessPage(req, type, mode) {
             <div style="border:1px solid #ddd; border-radius:8px; overflow:hidden; width:100%; max-width:600px;">
               <canvas id="canvas" style="display:block; width:100%; height:450px; background:#fff;"></canvas>
             </div>
+            <div class="colors">
+              <button class="color-btn active" data-color="#000000" style="background:#000000"></button>
+              <button class="color-btn" data-color="#ffffff" style="background:#ffffff"></button>
+              <button class="color-btn" data-color="#ff0000" style="background:#ff0000"></button>
+              <button class="color-btn" data-color="#FFA500" style="background:#FFA500"></button>
+              <button class="color-btn" data-color="#ffff00" style="background:#ffff00"></button>
+              <button class="color-btn" data-color="#00aa00" style="background:#00aa00"></button>
+              <button class="color-btn" data-color="#00ffff" style="background:#00ffff"></button>
+              <button class="color-btn" data-color="#0000ff" style="background:#0000ff"></button>
+              <button class="color-btn" data-color="#ff00ff" style="background:#ff00ff"></button>
+              <button class="color-btn" data-color="#964B00" style="background:#964B00"></button>
+            </div>
             <div class="row" style="margin-top:1rem; margin-bottom:1rem; display:flex; gap:.5rem; flex-wrap: wrap;">
               <button id="clearCanvas" class="btn">Clear</button>
               <button id="saveCanvas" class="btn">Join game</button>
@@ -390,12 +561,14 @@ function getGuessPage(req, type, mode) {
     <script>
       const area = document.getElementById('answer');
       const clearBtn = document.getElementById('clearAnswer');
+      const colorButtons = document.querySelectorAll('.color-btn');
       const submitBtn = document.getElementById('submitAnswer');
       const canvas = document.getElementById('canvas');
       const clearCanvasBtn = document.getElementById('clearCanvas');
       const submitCanvasBtn = document.getElementById('saveCanvas');
       const progressCanvas = document.getElementById('canvasProgress');
       const refreshBtn = document.getElementById('refresh');
+
       function resizeCanvas() {
         const ratio = Math.max(window.devicePixelRatio || 1, 1);
         const rect = canvas.getBoundingClientRect();
@@ -403,16 +576,32 @@ function getGuessPage(req, type, mode) {
         canvas.height = 450 * ratio;
         const ctx = canvas.getContext('2d');
         ctx.scale(ratio, ratio);
+        console.log("resizeCanvas")
       }
       resizeCanvas();
       window.addEventListener('resize', resizeCanvas);
       window.resizeCanvas = resizeCanvas;
-      const signaturePad = new SignaturePad(canvas, { minWidth: 1.5, maxWidth: 3, penColor: 'black' });
+      let signaturePad;
+      function recreatePad() {
+        signaturePad = new SignaturePad(canvas, { minWidth: 1.5, maxWidth: 3, penColor: 'black', backgroundColor: 'rgb(255, 255, 255)' });
+        console.log("Recreate pad")
+      }
+      window.recreatePad = recreatePad;
+
+      
       clearCanvasBtn.addEventListener('click', async () => {
-        signaturePad.clear();
+        if (signaturePad) signaturePad.clear();
+      });
+      colorButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const color = btn.getAttribute('data-color');
+          if (signaturePad) signaturePad.penColor = color;
+          colorButtons.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
       });
       submitCanvasBtn.addEventListener('click', async () => {
-        if (signaturePad.isEmpty()) {
+        if (signaturePad && signaturePad.isEmpty()) {
           alert('Please draw something first');
           return;
         }
@@ -422,8 +611,8 @@ function getGuessPage(req, type, mode) {
         clearCanvasBtn.classList.add('hidden');
         submitCanvasBtn.classList.add('hidden');
         progressCanvas.classList.remove('hidden');
-        const dataUrl = signaturePad.toDataURL('image/png');
         try {
+          const dataUrl = signaturePad.toDataURL('image/jpeg');
           const res = await fetch('/api/signature', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

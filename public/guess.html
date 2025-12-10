@@ -28,6 +28,25 @@
         border-radius: 50%;
         animation: spin .8s linear infinite;
       }
+      .colors {
+        margin-top: .75rem;
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .color-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 2px solid #ccc;
+        cursor: pointer;
+        box-sizing: border-box;
+      }
+      .color-btn.active {
+        border-color: #000;
+        box-shadow: 0 0 0 2px rgba(0,0,0,.15);
+      }
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
@@ -51,6 +70,18 @@
       <div style="border:1px solid #ddd; border-radius:8px; overflow:hidden; width:100%; max-width:600px;">
         <canvas id="canvas" style="display:block; width:100%; height:450px; background:#fff;"></canvas>
       </div>
+      <div class="colors">
+        <button class="color-btn active" data-color="#000000" style="background:#000000"></button>
+        <button class="color-btn" data-color="#ffffff" style="background:#ffffff"></button>
+        <button class="color-btn" data-color="#ff0000" style="background:#ff0000"></button>
+        <button class="color-btn" data-color="#FFA500" style="background:#FFA500"></button>
+        <button class="color-btn" data-color="#ffff00" style="background:#ffff00"></button>
+        <button class="color-btn" data-color="#00aa00" style="background:#00aa00"></button>
+        <button class="color-btn" data-color="#00ffff" style="background:#00ffff"></button>
+        <button class="color-btn" data-color="#0000ff" style="background:#0000ff"></button>
+        <button class="color-btn" data-color="#ff00ff" style="background:#ff00ff"></button>
+        <button class="color-btn" data-color="#964B00" style="background:#964B00"></button>
+      </div>
       <div class="row" style="margin-top:1rem; display:flex; gap:.5rem; flex-wrap: wrap;">
         <button id="clearBtn" class="btn">Clear</button>
         <button id="saveBtn" class="btn">Create game</button>
@@ -64,6 +95,7 @@
       const clearBtn = document.getElementById('clearBtn');
       const submitBtn = document.getElementById('saveBtn');
       const progress = document.getElementById('saveProgress');
+      const colorButtons = document.querySelectorAll('.color-btn');
 
       function resizeCanvas() {
         const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -76,8 +108,16 @@
       resizeCanvas();
       window.addEventListener('resize', resizeCanvas);
 
-      const signaturePad = new SignaturePad(canvas, { minWidth: 1.5, maxWidth: 3, penColor: 'black' });
+      const signaturePad = new SignaturePad(canvas, { minWidth: 1.5, maxWidth: 3, penColor: 'black', backgroundColor: 'rgb(255, 255, 255)' });
 
+      colorButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const color = btn.getAttribute('data-color');
+          signaturePad.penColor = color;
+          colorButtons.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
       clearBtn.addEventListener('click', async () => {
         signaturePad.clear();
       });
@@ -93,7 +133,7 @@
         clearBtn.classList.add('hidden');
         submitBtn.classList.add('hidden');
         progress.classList.remove('hidden');
-        const dataUrl = signaturePad.toDataURL('image/png');
+        const dataUrl = signaturePad.toDataURL('image/jpeg');
         try {
           const res = await fetch('/api/signature', {
             method: 'POST',

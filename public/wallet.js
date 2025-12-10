@@ -10,6 +10,7 @@ const WalletUI = (() => {
   let contractGuess = '0x5B46523CFba1D1a45De3A7b552b6Bc1a3e4e843e';
   let contractMatch = '0xeC4611722b3BB8A9873E062Dc4c908b3Ea813Bd3';
   let contractQuiz = '0xA23B1b240903d7a9b85b7878139f936DDA6Bd820';
+  let contractPunch = '0xA23B1b240903d7a9b85b7878139f936DDA6Bd820';
 
   window.quizPollInterval = null;
 
@@ -280,6 +281,28 @@ const WalletUI = (() => {
     }
   }
 
+  async function getGamePunch(gameId) {
+    if (!client) return;
+    renderGamePunch(0, null);
+    try {
+      const game = await client.readContract({
+        address: contractPunch,
+        functionName: 'get_game',
+        args: [gameId],
+      });
+      let res = JSON.parse(game);
+      if (res.error) {
+        renderGamePunch(2, null);
+      } else {
+        renderGamePunch(1, res);
+      }
+      console.error('Success getting joke:', res);
+    } catch (error) {
+      renderGamePunch(2, null);
+      console.error('Error getting joke:', error);
+    }
+  }
+
   async function getGameQuiz(gameId, { silent = false } = {}) {
     if (!client) return;
   
@@ -342,6 +365,38 @@ const WalletUI = (() => {
     }
   }
 
+  async function getMyPunch() {
+    if (!client) return;
+    const clearBtn = document.getElementById('clearBtn');
+    const submitBtn = document.getElementById('saveBtn');
+    const progress = document.getElementById('saveProgress');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (submitBtn) submitBtn.classList.add('hidden');
+    if (progress) progress.classList.remove('hidden');
+    try {
+      const game = await client.readContract({
+        address: contractPunch,
+        functionName: 'get_my_game',
+        args: [],
+      });
+      let res = JSON.parse(game);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      if (res.error) {
+        renderPunchAdmin(null);
+      } else {
+        renderPunchAdmin(res);
+      }
+      console.error('Success getting my punch:', res);
+    } catch (error) {
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      console.error('Error getting my punch:', error);
+    }
+  }
+
   async function checkPage() {
     const pageName = document.body.dataset.pageName;
     switch (pageName) {
@@ -356,9 +411,14 @@ const WalletUI = (() => {
         break;
       case 'quiz':
         getGameQuiz(document.body.dataset.gameId);
+      case 'punch':
+        getGamePunch(document.body.dataset.gameId);
         break;
       case 'start_quiz':
         getMyQuiz();
+        break;
+      case 'start_punch':
+        getMyPunch();
         break;
       case 'profile':
         getGames();
@@ -519,6 +579,41 @@ const WalletUI = (() => {
     }
   }
 
+  async function joke(answer) {
+    if (!client) return;
+    const clearBtn = document.getElementById('clearAnswer');
+    const submitBtn = document.getElementById('submitAnswer');
+    const progress = document.getElementById('answerProgress');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (submitBtn) submitBtn.classList.add('hidden');
+    if (progress) progress.classList.remove('hidden');
+    try {
+      const txHash = await client.writeContract({
+        address: contractPunch,
+        functionName: "join_game",
+        args: [document.body.dataset.gameId, answer],
+      });
+      console.error('Success tx answer joke:', txHash);
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 100,
+        interval: 2000,
+      });
+      console.error('Success setting answer joke:', receipt);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      getStat();
+      getGamePunch(document.body.dataset.gameId);
+    } catch (error) {
+      console.error('Error setting answer joke:', error);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+    }
+  }
+
   async function gameQuiz(gameTitle, gameLang, gameQty, gameUrl, gameWrong) {
     if (!client) return;
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -583,6 +678,41 @@ const WalletUI = (() => {
       window.location.href = `/match/${id}`;
     } catch (error) {
       console.error('Error setting room:', error);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+    }
+  }
+
+  async function gamePunch(theme) {
+    if (!client) return;
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const clearBtn = document.getElementById('clearBtn');
+    const submitBtn = document.getElementById('saveBtn');
+    const progress = document.getElementById('saveProgress');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (submitBtn) submitBtn.classList.add('hidden');
+    if (progress) progress.classList.remove('hidden');
+    try {
+      const txHash = await client.writeContract({
+        address: contractPunch,
+        functionName: "create_game",
+        args: [id, theme],
+      });
+      console.error('Success tx joke:', txHash);
+      const receipt = await client.waitForTransactionReceipt({
+        hash: txHash,
+        status: TransactionStatus.ACCEPTED,
+        retries: 100,
+        interval: 2000,
+      });
+      console.error('Success setting joke:', receipt);
+      if (clearBtn) clearBtn.classList.remove('hidden');
+      if (submitBtn) submitBtn.classList.remove('hidden');
+      if (progress) progress.classList.add('hidden');
+      window.location.href = `/punch/${id}`;
+    } catch (error) {
+      console.error('Error setting joke:', error);
       if (clearBtn) clearBtn.classList.remove('hidden');
       if (submitBtn) submitBtn.classList.remove('hidden');
       if (progress) progress.classList.add('hidden');
@@ -683,6 +813,27 @@ const WalletUI = (() => {
       getMyQuiz();
     } catch (error) {
       console.error('Error start:', error);
+    }
+  }
+
+  function renderPunchAdmin(game) {
+    const question = document.getElementById('theme');
+    const clearBtn = document.getElementById('clearBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const gameLinkP = document.getElementById('game_link_p');
+    const gameLink = document.getElementById('game_link');
+    if (gameLinkP) gameLinkP.classList.add('hidden');
+    if (question) question.value = "";
+    if (clearBtn) clearBtn.disabled = false;
+    if (saveBtn) saveBtn.disabled = false;
+    if (game) {
+      if (game.game_time_left) {
+        if (question && quiz.game_question) title.value = quiz.game_question;
+        if (clearBtn) clearBtn.disabled = true;
+        if (saveBtn) saveBtn.disabled = true;
+        if (gameLinkP) gameLinkP.classList.remove('hidden');
+        if (gameLink) gameLink.href = "/punch/" + quiz.game_id
+      }
     }
   }
 
@@ -996,6 +1147,82 @@ const WalletUI = (() => {
     }
   }
 
+  function renderGamePunch(state, game) {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const dataContainer = document.getElementById('gameContainer');
+    const emptyContainer = document.getElementById('emptyContainer');
+    switch (state) {
+      case 0:
+        loadingIndicator.classList.remove('hidden');
+        dataContainer.classList.add('hidden');
+        emptyContainer.classList.add('hidden');
+        break;
+      case 1:
+        loadingIndicator.classList.add('hidden');
+        dataContainer.classList.remove('hidden');
+        emptyContainer.classList.add('hidden');
+        const padTheme = document.getElementById('game_theme');
+        const timer = document.getElementById('timer');
+        const players = document.getElementById('players');
+        const answers = document.getElementById('answers');
+        const task = document.getElementById('task');
+
+        padTheme.textContent = game.game_question;
+        padTheme.classList.remove('hidden');
+   
+        if (game.time_left) {
+          players.classList.add('hidden');
+          if (game.answered == "True" || game.type == 1 && getAddress().toLowerCase().trim() == game.creator.toLowerCase().trim()) {
+            answers.style.display = 'none';
+            task.classList.remove('hidden');
+            if (game.answered == "True") {
+              task.textContent = "You have already made a joke";
+            } else {
+              task.textContent = "You are the creator of the game and cannot punch line, but you'll get points from players' jokes";
+            }
+            task.style.padding = '16px 0';
+          } else {
+            answers.style.display = 'block';
+            task.classList.add('hidden');
+            task.textContent = "";
+          }
+          timer.classList.remove('hidden');
+          timer.style.padding = '8px 0';
+          if (window.dftWidgetTimer) {
+            clearInterval(window.dftWidgetTimer);
+            window.dftWidgetTimer = null;
+          }
+          let secs = 0;
+          secs = Math.round(Number(game.time_left));
+          timer.style.color = '#6b7280';
+          timer.textContent = 'Game finish in ' + fmt(secs);
+          window.dftWidgetTimer = setInterval(()=>{ 
+            secs-=1; 
+            if (secs<=0){ 
+              clearInterval(window.dftWidgetTimer); 
+              window.dftWidgetTimer = null; 
+              timer.textContent='Finished';
+              getGamePunch(game.game_id);
+            } else { 
+              timer.textContent = 'Game finish in ' + fmt(secs);
+            } 
+          }, 1000); 
+        } else {
+          players.classList.remove('hidden');
+          answers.style.display = 'none';
+          timer.classList.add('hidden');
+          task.classList.add('hidden');
+          showPlayers(game.game_players, 4)
+        }
+        break;
+      case 2:
+        loadingIndicator.classList.add('hidden');
+        dataContainer.classList.add('hidden');
+        emptyContainer.classList.remove('hidden');
+        break;
+    }
+  }
+
   function renderGame(state, game) {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const dataContainer = document.getElementById('gameContainer');
@@ -1029,6 +1256,7 @@ const WalletUI = (() => {
             } else {
               pad.classList.remove('hidden');
               window.resizeCanvas();
+              window.recreatePad();
             }
           } else {
             pad.classList.add('hidden');
@@ -1666,6 +1894,11 @@ const WalletUI = (() => {
           answerEl.textContent = "Answer: " + String(item.answer);
           answerEl.style.fontSize = '13px';
           left.appendChild(answerEl);
+        } else if (type == 4) {
+          const answerEl = document.createElement('div');
+          answerEl.textContent = "Joke: " + String(item.answer);
+          answerEl.style.fontSize = '13px';
+          left.appendChild(answerEl);
         } else {
           const answerEl = document.createElement('img');
           answerEl.src = item.answer;
@@ -1692,38 +1925,51 @@ const WalletUI = (() => {
     const root = document.getElementById(rootId);
     if (!root) return;
     root.textContent = '';
+  
     const header = document.createElement('div');
     header.style.display = 'grid';
-    header.style.gridTemplateColumns = '1fr auto';
+    header.style.gridTemplateColumns = '40px 1fr auto'; // колонка для номера
     header.style.gap = '8px';
     header.style.fontWeight = '600';
     header.style.padding = '8px 0';
     header.style.borderBottom = '1px solid #e5e7eb';
+  
+    const hIndex = document.createElement('div');
+    hIndex.textContent = '#';
+    hIndex.style.textAlign = 'left';
+  
     const hPlayer = document.createElement('div');
     hPlayer.textContent = 'PLAYER';
+  
     const hPoints = document.createElement('div');
     hPoints.textContent = 'points';
     hPoints.style.textAlign = 'right';
+  
+    header.appendChild(hIndex);
     header.appendChild(hPlayer);
     header.appendChild(hPoints);
     root.appendChild(header);
-    // строки
-    items.forEach(item => {
+  
+    items.forEach((item, index) => {
       const row = document.createElement('div');
       row.style.display = 'grid';
-      row.style.gridTemplateColumns = '1fr auto';
+      row.style.gridTemplateColumns = '40px 1fr auto'; // та же сетка, что и в header
       row.style.gap = '8px';
       row.style.padding = '10px 0';
       row.style.borderBottom = '1px solid #f3f4f6';
+  
+      const indexEl = document.createElement('div');
+      indexEl.textContent = String(index + 1);
+      indexEl.style.fontWeight = '600';
+      indexEl.style.textAlign = 'left';
   
       const left = document.createElement('div');
       const walletEl = document.createElement('div');
       walletEl.textContent = maskAddress(item.wallet) ?? '';
       walletEl.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, monospace';
       walletEl.style.fontSize = '14px';
-      
       left.appendChild(walletEl);
-      
+  
       if (item.nick && String(item.nick).trim() !== '') {
         const nickEl = document.createElement('div');
         nickEl.textContent = String(item.nick);
@@ -1731,16 +1977,16 @@ const WalletUI = (() => {
         nickEl.style.fontSize = '12px';
         left.appendChild(nickEl);
       }
-      
+  
       const pointsEl = document.createElement('div');
       pointsEl.textContent = String(item.points ?? 0);
       pointsEl.style.textAlign = 'right';
       pointsEl.style.fontWeight = '600';
-      
+  
+      row.appendChild(indexEl);
       row.appendChild(left);
       row.appendChild(pointsEl);
       root.appendChild(row);
-      
     });
   }
 
@@ -1962,8 +2208,10 @@ const WalletUI = (() => {
     setNickname, 
     answer, 
     answerMatch,
+    joke,
     gameGuess, 
     gameMatch,
+    gamePunch,
     gameQuiz,
     checkPage,
     sendQuizAnswer,

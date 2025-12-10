@@ -137,17 +137,6 @@
           const gameQty = (qty && qty.value || '').trim();
           const gameLang = languages.find(l => l.code === select.value)?.name || select.value;
           if (!gameUrl) { alert('Please enter an url'); return; }
-          //try {
-          //    const res = await fetch('/api/quiz', {
-          //    method: 'POST',
-          //    headers: { 'Content-Type': 'application/json' },
-          //    body: JSON.stringify({ answer_id: "1", answer: value })
-          //  });
-          //  const json = await res.json();
-           // if (!res.ok) throw new Error(json.error || 'Save failed');
-          //  console.log("Encode ", json)
-          //} catch (e) {
-          //}
           WalletUI.gameQuiz(gameTitle, gameLang, gameQty, gameUrl, false);
         } catch(e) { alert(e.message); }
       });
