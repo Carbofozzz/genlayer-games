@@ -7,10 +7,10 @@ const WalletUI = (() => {
   let client = null;
   let inited = false;
   let contractStat = '0x98e2797FB846fFf75BF5790681d52C80C1259e48';
-  let contractGuess = '0x5B46523CFba1D1a45De3A7b552b6Bc1a3e4e843e';
+  let contractGuess = '0x3F8e20385B10B8b56802e28B81eb9C1d8A3960a0';
   let contractMatch = '0xeC4611722b3BB8A9873E062Dc4c908b3Ea813Bd3';
   let contractQuiz = '0xA23B1b240903d7a9b85b7878139f936DDA6Bd820';
-  let contractPunch = '0xA23B1b240903d7a9b85b7878139f936DDA6Bd820';
+  let contractPunch = '0x51eD95A3c625A8eAE5e7ED87Cc586ec54220c718';
 
   window.quizPollInterval = null;
 
@@ -118,7 +118,7 @@ const WalletUI = (() => {
       tab.addEventListener('click', () => {
         const name = tab.dataset.tab;
         tabs.forEach(t => t.classList.toggle('lb-tab-active', t === tab));
-        ['overall', 'guess', 'match', 'quiz'].forEach(key => {
+        ['overall', 'guess', 'match', 'quiz', 'punch'].forEach(key => {
           const el = document.getElementById('leaderboard-' + key);
           if (el) el.style.display = key === name ? '' : 'none';
         });
@@ -129,8 +129,8 @@ const WalletUI = (() => {
           getLeaderboardGuess();
         } else if (name === 'match') {
           getLeaderboardMatch();
-        } else if (name === 'quiz') {
-          getLeaderboardQuiz();
+        } else if (name === 'punch') {
+          getLeaderboardPunch();
         }
       });
     });
@@ -169,7 +169,7 @@ const WalletUI = (() => {
         args: [1, 50],
       });
       let res = JSON.parse(rating);
-      console.error('Success getting leaderboard: ', res);
+      console.error('Success getting leaderboard guess: ', res);
       const sorted = [...res].sort((a, b) => {
         const pointsA = Number(a.points) || 0;
         const pointsB = Number(b.points) || 0;
@@ -177,7 +177,7 @@ const WalletUI = (() => {
       });
       renderLeaderboard('leaderboard-guess', sorted);
     } catch (error) {
-      console.error('Error getting leaderboard:', error);
+      console.error('Error getting leaderboard guess:', error);
     }
   }
 
@@ -190,7 +190,7 @@ const WalletUI = (() => {
         args: [2, 50],
       });
       let res = JSON.parse(rating);
-      console.error('Success getting leaderboard: ', res);
+      console.error('Success getting leaderboard match: ', res);
       const sorted = [...res].sort((a, b) => {
         const pointsA = Number(a.points) || 0;
         const pointsB = Number(b.points) || 0;
@@ -198,7 +198,28 @@ const WalletUI = (() => {
       });
       renderLeaderboard('leaderboard-match', sorted);
     } catch (error) {
-      console.error('Error getting leaderboard:', error);
+      console.error('Error getting leaderboard match:', error);
+    }
+  }
+
+  async function getLeaderboardPunch() {
+    if (!client) return;
+    try {
+      const rating = await client.readContract({
+        address: contractStat,
+        functionName: 'get_points_by_game',
+        args: [4, 50],
+      });
+      let res = JSON.parse(rating);
+      console.error('Success getting leaderboard punch: ', res);
+      const sorted = [...res].sort((a, b) => {
+        const pointsA = Number(a.points) || 0;
+        const pointsB = Number(b.points) || 0;
+        return pointsB - pointsA;
+      });
+      renderLeaderboard('leaderboard-punch', sorted);
+    } catch (error) {
+      console.error('Error getting leaderboard punch:', error);
     }
   }
 
@@ -828,11 +849,11 @@ const WalletUI = (() => {
     if (saveBtn) saveBtn.disabled = false;
     if (game) {
       if (game.game_time_left) {
-        if (question && quiz.game_question) title.value = quiz.game_question;
+        if (question && game.game_question) question.value = game.game_question;
         if (clearBtn) clearBtn.disabled = true;
         if (saveBtn) saveBtn.disabled = true;
         if (gameLinkP) gameLinkP.classList.remove('hidden');
-        if (gameLink) gameLink.href = "/punch/" + quiz.game_id
+        if (gameLink) gameLink.href = "/punch/" + game.game_id
       }
     }
   }
@@ -1169,13 +1190,21 @@ const WalletUI = (() => {
 
         padTheme.textContent = game.game_question;
         padTheme.classList.remove('hidden');
+
+        const myAddr = (getAddress() || '').toLowerCase().trim();
+        const creator = (game.game_creator || '').toLowerCase().trim();
+        const playersArr = Array.isArray(game.game_players) ? game.game_players : [];
+
+        const alreadyPlayed = playersArr.some(p => {
+          return (p.address || '').toLowerCase().trim() === myAddr;
+        });
    
-        if (game.time_left) {
+        if (game.game_time_left) {
           players.classList.add('hidden');
-          if (game.answered == "True" || game.type == 1 && getAddress().toLowerCase().trim() == game.creator.toLowerCase().trim()) {
+          if (alreadyPlayed || myAddr === creator) {
             answers.style.display = 'none';
             task.classList.remove('hidden');
-            if (game.answered == "True") {
+            if (alreadyPlayed) {
               task.textContent = "You have already made a joke";
             } else {
               task.textContent = "You are the creator of the game and cannot punch line, but you'll get points from players' jokes";
@@ -1193,7 +1222,7 @@ const WalletUI = (() => {
             window.dftWidgetTimer = null;
           }
           let secs = 0;
-          secs = Math.round(Number(game.time_left));
+          secs = Math.round(Number(game.game_time_left));
           timer.style.color = '#6b7280';
           timer.textContent = 'Game finish in ' + fmt(secs);
           window.dftWidgetTimer = setInterval(()=>{ 
@@ -1840,14 +1869,63 @@ const WalletUI = (() => {
   }
 
   function showPlayers(items, type) {
+    const root = document.getElementById('players');
+    if (!root) return;
+    root.textContent = '';
+
+    if ((type === 4 || type === 1) && items.length > 0) {
+      const totalScore = items.reduce((acc, p) => acc + (Number(p.score) || 0), 0);
+      const creatorScore = Math.floor(totalScore * 0.1); 
+  
+      const creatorWrap = document.createElement('div');
+      creatorWrap.style.display = 'flex';
+      creatorWrap.style.justifyContent = 'space-between';
+      creatorWrap.style.alignItems = 'center';
+      creatorWrap.style.padding = '.5rem .45rem';
+      creatorWrap.style.marginBottom = '.5rem';
+      creatorWrap.style.borderRadius = '.5rem';
+      creatorWrap.style.background = '#f3f4f6'; 
+      creatorWrap.style.border = '1px solid #e5e7eb';
+
+      const left = document.createElement('div');
+      left.style.display = 'flex';
+      left.style.flexDirection = 'column';
+      left.style.gap = '2px';
+
+      const labelEl = document.createElement('div');
+      labelEl.textContent = 'Game creator points';
+      labelEl.style.fontSize = '12px';
+      labelEl.style.fontWeight = '600';
+      labelEl.style.color = '#4b5563';
+
+      const helperEl = document.createElement('div');
+      helperEl.textContent = '10% of players total';
+      helperEl.style.fontSize = '11px';
+      helperEl.style.color = '#6b7280';
+
+      left.appendChild(labelEl);
+      left.appendChild(helperEl);
+
+      const pointsEl = document.createElement('div');
+      pointsEl.textContent = String(creatorScore);
+      pointsEl.style.fontWeight = '600';
+      pointsEl.style.fontSize = '14px';
+      pointsEl.style.color = '#111827';
+
+      creatorWrap.appendChild(left);
+      creatorWrap.appendChild(pointsEl);
+
+      creatorWrap.style.marginTop = '.75rem';
+
+      root.appendChild(creatorWrap);
+    }
+
     const sorted = [...items].sort((a, b) => {
       const pointsA = Number(a.score) || 0;
       const pointsB = Number(b.score) || 0;
       return pointsB - pointsA;
     });
-    const root = document.getElementById('players');
-    if (!root) return;
-    root.textContent = '';
+
     const header = document.createElement('div');
     header.style.display = 'grid';
     header.style.gridTemplateColumns = '1fr auto';
@@ -2029,6 +2107,9 @@ const WalletUI = (() => {
       } else if (item.game_type == "3") {
         a.href = '/quiz/' + item.id;
         a.textContent = "AiQuiz (" + item.id + ")";
+      } else if (item.game_type == "4") {
+        a.href = '/punch/' + item.id;
+        a.textContent = "PunchLine (" + item.id + ")";
       } else {
         a.textContent = item.id;
       }

@@ -3,6 +3,7 @@
 from genlayer import *
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from itertools import islice
 
 @allow_storage
 @dataclass
@@ -104,6 +105,13 @@ class PunchLineStorage(gl.Contract):
             if game is None:
                 return { "error": "Game not found" }
             return game.to_dict()
+        except Exception as e:
+            return { "error": str(e) }
+
+    @gl.public.view
+    def get_games(self, limit: int) -> dict:
+        try:
+            return {k: v.game_creator for k, v in islice(self.games.items(), limit) }
         except Exception as e:
             return { "error": str(e) }
 

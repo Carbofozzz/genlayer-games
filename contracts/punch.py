@@ -31,7 +31,7 @@ class Score:
 
     def to_dict(self, address: str, full: bool):
         if full:
-            return {"score": str(self.score), "answer": str(self.answer), "address": address}
+            return {"score": str(self.score_value), "answer": str(self.score_answer), "address": address}
         return {"address": address}
 
 @allow_storage
@@ -78,14 +78,14 @@ class PunchLine(gl.Contract):
     storage: Address
     active_games: TreeMap[Address, Game]
 
-    def __init__(self, stat_contract: str):#, storage_contract: str):
+    def __init__(self, stat_contract: str, storage_contract: str):
         self.game_duration = 10
-        self.game_coeff = 100
+        self.game_coeff = 50
         self.creator_royalty = 10
         self.error = "None"
         self.owner = gl.message.sender_address
         self.stat = Address(stat_contract)
-        #self.storage = Address(storage_contract)
+        self.storage = Address(storage_contract)
 
     @gl.public.write
     def add_stat_contract(self, stat_contract: str) -> None:
@@ -134,8 +134,8 @@ class PunchLine(gl.Contract):
         cache_active = game_cache is not None and not _check_time_due(game_cache, time_str)
         if cache_active:
             raise Exception("You have an unfinished game")
-        #if game_cache is not None:
-            #StorageIface(self.storage).emit().add_game(game_cache.to_dict(time_str))
+        if game_cache is not None:
+            StorageIface(self.storage).emit().add_game(game_cache.to_dict(time_str))
         try:
             t = _convert_time(time_str)
             game = Game(
@@ -146,7 +146,7 @@ class PunchLine(gl.Contract):
             game.game_duration = duration
             game.game_question = game_question
             self.active_games[sender_address] = game
-            #StatIface(self.stat).emit().add_game_to_archive(sender_address.as_hex, potential_game_id, True, str(t), 4)
+            StatIface(self.stat).emit().add_game_to_archive(sender_address.as_hex, potential_game_id, True, str(t), 4)
             self.error = game_question
         except Exception as e:
             self.error = "error create: " + str(e)
@@ -167,26 +167,23 @@ class PunchLine(gl.Contract):
         speed_ratio = _check_speed_ratio(game_cache, time_str)
         start = game_cache.game_question
         def non_det():
-            compare_prompt = f"""
-Compare the initial line {start} and the user's response {game_answer} as a single joke. 
-Rate the joke's quality, considering humor, irony, sarcasm, idioms, wordplay, and paradox. 
+            return start + " " + game_answer
+        ai_score = gl.eq_principle.prompt_non_comparative(
+            fn=non_det, 
+            task="""
+Analize this text as a joke. Rate its quality, considering humor, irony, sarcasm, idioms, wordplay, and paradox. 
 Rate the joke from 0 to 10, where 0 is a completely inadequate response and an unfunny joke, and 10 is a perfectly witty and funny response.
-Return a JSON with the name as follows
-{{
-    "rating": str,
-}}
-It is mandatory that you respond only using the JSON format above,
-nothing else. Don't include any other words or characters,
-your output must be only JSON without any formatting prefix or suffix.
-This result should be perfectly parsable by a JSON parser without errors.
+            """,
+            criteria="""
+The answer must be a numerical score from 0 to 10.
+Consider humor, irony, sarcasm, idioms, wordplay, and paradox.
             """
-            result = gl.nondet.exec_prompt(compare_prompt)
-            return int(json.loads(_extract_json_from_string(result)).get("rating", "0"))
-        ai_score = gl.eq_principle.prompt_comparative(non_det, "The result must not differ by more than 20%")
+        )
         try:
             score_num = float(ai_score) * float(self.game_coeff) * speed_ratio
-            #StatIface(self.stat).emit().add_user_points_game_to_archive(sender_address.as_hex, game_id, game_cache.game_time, 4, int(score_num))
-            #StatIface(self.stat).emit().add_user_points_by_game(game_cache.game_creator.as_hex, 4, int((score_num * self.creator_royalty) / 100))
+            game_cache.game_players[sender_address] = Score(score_value=int(score_num), score_answer=game_answer)
+            StatIface(self.stat).emit().add_user_points_game_to_archive(sender_address.as_hex, game_id, game_cache.game_time, 4, int(score_num))
+            StatIface(self.stat).emit().add_user_points_by_game(game_cache.game_creator.as_hex, 4, int((score_num * self.creator_royalty) / 100))
             self.error = str(score_num)
         except Exception as e:
             self.error = "error answer: " + str(e)

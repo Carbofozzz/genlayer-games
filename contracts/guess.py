@@ -78,6 +78,7 @@ class Game:
 class GuessPicture(gl.Contract):
     game_duration: u256
     game_coeff: u256
+    creator_royalty: u256
     error: str
     secret: str
     owner: Address
@@ -88,6 +89,7 @@ class GuessPicture(gl.Contract):
     def __init__(self, stat_contract: str, storage_contract: str):
         self.game_duration = 10
         self.game_coeff = 50
+        self.creator_royalty = 10
         self.error = "None"
         self.secret = ""
         self.owner = gl.message.sender_address
@@ -117,6 +119,12 @@ class GuessPicture(gl.Contract):
         if self.owner != gl.message.sender_address:
             raise Exception("You are not the owner")
         self.game_duration = duration
+
+    @gl.public.write
+    def set_creator_royalty(self, royalty: int) -> None:
+        if self.owner != gl.message.sender_address:
+            raise Exception("You are not the owner")
+        self.creator_royalty = royalty
 
     @gl.public.write
     def set_game_coeff(self, coeff: int) -> None:
@@ -277,6 +285,7 @@ This result should be perfectly parsable by a JSON parser without errors.
                 game_cache.game_players[sender_address] = Score(score=int(score_num), answer=answer)
             StorageIface(self.storage).emit().edit_game(game_id, sender_address.as_hex, int(score_num), answer)
             StatIface(self.stat).emit().add_user_points_game_to_archive(sender_address.as_hex, game_id, game.get("game_time"), 1, int(score_num))
+            StatIface(self.stat).emit().add_user_points_by_game(game_cache.game_creator.as_hex, 1, int((score_num * self.creator_royalty) / 100))
             self.error = str(score_num)
         except Exception as e:
             self.error = "error answer: " + str(e)
@@ -292,6 +301,10 @@ This result should be perfectly parsable by a JSON parser without errors.
     @gl.public.view
     def get_game_coeff(self) -> int:
         return int(self.game_coeff)
+
+    @gl.public.view
+    def get_creator_royalty(self) -> int:
+        return int(self.creator_royalty)
 
     @gl.public.view
     def get_game(self, game_id: str) -> str:
