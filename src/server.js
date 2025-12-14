@@ -292,6 +292,18 @@ function getPunchPage(req) {
         if (submitBtn) submitBtn.addEventListener('click', async () => {
           try {
             if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+          } catch (e) { 
+            alert(e.message); 
+            return; 
+          }
+          try {
+            if (!WalletUI.nickIsSet()) throw new Error('Please provide your Discord nickname first.');
+          } catch (e) { 
+            alert(e.message); 
+            window.location.href = '/me';
+            return; 
+          }
+          try {
             const value = (area && area.value || '').trim();
             if (!value) { alert('Please enter a punch line'); return; }
             WalletUI.joke(value);
@@ -608,6 +620,13 @@ function getGuessPage(req, type, mode) {
         try {
           if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
         } catch (e) { alert(e.message); return; }
+        try {
+          if (!WalletUI.nickIsSet()) throw new Error('Please provide your Discord nickname first.');
+        } catch (e) { 
+          alert(e.message); 
+          window.location.href = '/me';
+          return; 
+        }
         clearCanvasBtn.classList.add('hidden');
         submitCanvasBtn.classList.add('hidden');
         progressCanvas.classList.remove('hidden');

@@ -64,7 +64,16 @@
       if (clearBtn) clearBtn.addEventListener('click', () => { if (area) area.value=''; });
       if (submitBtn) submitBtn.addEventListener('click', async () => {
         try {
-          if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          if (!WalletUI.nickIsSet()) throw new Error('Please provide your Discord nickname first.');
+        } catch (e) { 
+          alert(e.message); 
+          window.location.href = `/me`;
+          return; 
+        }
+        try {
           const value = (area && area.value || '').trim();
           if (!value) { alert('Please enter a theme'); return; }
           WalletUI.gameMatch(value);

@@ -130,6 +130,13 @@
         try {
           if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
         } catch (e) { alert(e.message); return; }
+        try {
+          if (!WalletUI.nickIsSet()) throw new Error('Please provide your Discord nickname first.');
+        } catch (e) { 
+          alert(e.message); 
+          window.location.href = `/me`;
+          return; 
+        }
         clearBtn.classList.add('hidden');
         submitBtn.classList.add('hidden');
         progress.classList.remove('hidden');

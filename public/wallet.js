@@ -4,6 +4,7 @@ import { TransactionStatus } from "https://esm.sh/genlayer-js/types";
 
 const WalletUI = (() => {
 
+  let hasNick = false;
   let client = null;
   let inited = false;
   let contractStat = '0x98e2797FB846fFf75BF5790681d52C80C1259e48';
@@ -91,11 +92,13 @@ const WalletUI = (() => {
       const addr = document.getElementById('addr');
       const area = document.getElementById('nick');
       if (nick.trim().length > 0 && nick.trim() != "Nick not set") {
+        hasNick = true;
         if (addr) addr.textContent = nick + " (points: " + res.points + ")";
         if (area) {
           area.value = nick;
         }
       } else {
+        hasNick = false;
         if (addr) addr.textContent = maskAddress(address) + " (points: " + res.points + ")";
         if (area) {
           area.value = "";
@@ -2263,6 +2266,7 @@ const WalletUI = (() => {
     }
   }
 
+  function nickIsSet() { return hasNick; }
   function isConnected(){ return !!localStorage.getItem('connectedAddress'); }
   function getAddress(){ return localStorage.getItem('connectedAddress') || ''; }
 
@@ -2296,7 +2300,8 @@ const WalletUI = (() => {
     gameQuiz,
     checkPage,
     sendQuizAnswer,
-    answerQuiz
+    answerQuiz,
+    nickIsSet
   };
 })();
 
