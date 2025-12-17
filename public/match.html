@@ -12,12 +12,13 @@
       .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
       .nav a { color: #0366d6; text-decoration: none; }
       .nav a.active { font-weight: 600; }
+      .match a { color: #0366d6; text-decoration: none; }
       .nav .links { display: flex; gap: .75rem; }
       .nav .wallet { display: flex; gap: .5rem; align-items: center; }
       .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
       .theme { margin-top: 1rem; }
       .theme input { width: 100%; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
-      .theme .row { margin-top: .5rem; display: flex; gap: .5rem; }
+      .theme .row { margin-top: .5rem; display: flex; gap: .5rem; flex-wrap: wrap; } 
       .hidden { display: none !important; }
       .theme .spinner {
         width: 20px;
@@ -32,7 +33,7 @@
       }
     </style>
   </head>
-  <body>
+  <body data-page-name="start_match">
     <div class="nav">
       <div class="links">
         <a href="/">New Game</a>
@@ -47,13 +48,14 @@
     <div class="wrap">
       <h1>Create a DrawMatch game</h1>
       <p>Set a theme for the drawing and start the game.</p>
-      <div class="theme" style="margin-top:1rem; display:flex; gap:.5rem; flex-wrap: wrap;">
+      <div class="theme" style="margin-top:1rem; gap:.5rem;">
         <input type="text" id="theme" placeholder="Type your theme..." maxlength="20"/>
         <div class="row">
             <button id="clearBtn" class="btn">Clear</button>
             <button id="saveBtn" class="btn">Create game</button>
             <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
         </div>
+        <p id="game_link_p" class="match hidden"><a id="game_link" href="">The Quiz page</a></p>
       </div>
     </div>
     <script type="module" src="/wallet.js"></script>

@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url';
 import AWS from 'aws-sdk';
 import { evmNetwork } from './config/network.js';
 import crypto from 'crypto';
+import sharp from 'sharp';
+import fetch from 'node-fetch';
 
 dotenv.config();
 
@@ -95,6 +97,196 @@ app.post('/api/signature', async (req, res) => {
   }
 });
 
+app.post('/api/contest', async (req, res) => {
+  try {
+    const { dataUrl } = req.body || {};
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Invalid dataUrl' });
+    }
+    const [meta, base64] = dataUrl.split(',');
+    const mimeType = meta.substring(meta.indexOf(':') + 1, meta.indexOf(';'));
+    const buffer = Buffer.from(base64, 'base64');
+
+    const processedBuffer = await sharp(buffer)
+      .resize({
+        width: 700,
+        withoutEnlargement: true,
+      })
+      .jpeg({
+        quality: 70,
+        progressive: true,
+      })
+      .toBuffer();
+
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const ext = 'jpg';
+    const filename = `cat_${id}.${ext}`;
+    const s3Key = `cats/${filename}`;
+
+    const params = {
+      Bucket: S3_BUCKET,
+      Key: s3Key,
+      Body: processedBuffer,
+      ContentType: mimeType,
+      ACL: 'public-read'
+    };
+    const s3UploadResult = await s3.upload(params).promise();
+    const s3Url = s3UploadResult.Location;
+    return res.json({ id, url: s3Url });
+  } catch (e) {
+    console.error('Error uploading to S3:', e);
+    return res.status(500).json({ error: 'Failed to save file' });
+  }
+});
+
+app.post('/api/contest/share-preview', async (req, res) => {
+  try {
+    const { catImageUrl, score, place, nick } = req.body || {};
+
+    if (!catImageUrl || typeof catImageUrl !== 'string') {
+      return res.status(400).json({ error: 'Invalid catImageUrl' });
+    }
+
+    const placeNum = Number(place);
+    const scoreNum = Number(score);
+    const safeNick = (nick || 'My cat').toString().slice(0, 40);
+
+    const imgResp = await fetch(catImageUrl);
+    if (!imgResp.ok) {
+      return res.status(400).json({ error: 'Failed to fetch cat image' });
+    }
+    const catBuffer = Buffer.from(await imgResp.arrayBuffer());
+
+    const WIDTH = 1200;
+    const HEIGHT = 630;
+
+    const AVATAR_SIZE = 400;
+    const catAvatar = await sharp(catBuffer)
+      .resize(AVATAR_SIZE, AVATAR_SIZE, {
+        fit: 'cover',
+        position: 'center',
+      })
+      .toBuffer();
+
+    const bgColor = '#050816';
+    const primaryColor = '#ffd54f';
+    const white = '#ffffff';
+
+    const title = 'Cat Beauty Contest';
+    const placeText = `#${isNaN(placeNum) ? '?' : placeNum} place`;
+    const scoreText = `${isNaN(scoreNum) ? '?' : scoreNum} points`;
+    const nickText = safeNick;
+
+    const overlaySvg = `
+      <svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+        <style>
+          .title { fill: ${white}; font-size: 50px; font-weight: 700; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          .place { fill: ${primaryColor}; font-size: 72px; font-weight: 800; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          .score { fill: ${white}; font-size: 40px; font-weight: 500; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          .nick  { fill: ${white}; font-size: 32px; font-weight: 400; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          .tag   { fill: #9fa8da; font-size: 26px; font-weight: 400; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          .logo   { fill: ${white}; font-size: 30px; font-weight: 500; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        </style>
+        <!-- лёгкий градиент фона -->
+        <defs>
+          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1e1b4b" />
+            <stop offset="50%" stop-color="#020617" />
+            <stop offset="100%" stop-color="#000000" />
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="${WIDTH}" height="${HEIGHT}" fill="url(#grad)" />
+        <!-- полупрозрачная плашка справа -->
+        <rect x="520" y="80" rx="32" ry="32" width="620" height="470" fill="rgba(0,0,0,0.35)" />
+        <text x="560" y="160" class="title">${title}</text>
+        <text x="560" y="260" class="place">${placeText}</text>
+        <text x="560" y="330" class="score">${scoreText}</text>
+        <text x="560" y="390" class="nick">${nickText}</text>
+        <text x="560" y="450" class="tag">guess-picture.onrender.com</text>
+        <text x="560" y="530" class="logo">Powered by GenLayer</text>
+      </svg>
+    `;
+
+    const base = sharp({
+      create: {
+        width: WIDTH,
+        height: HEIGHT,
+        channels: 4,
+        background: bgColor,
+      },
+    });
+
+    const avatarMaskSvg = `
+      <svg width="${AVATAR_SIZE}" height="${AVATAR_SIZE}" viewBox="0 0 ${AVATAR_SIZE} ${AVATAR_SIZE}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="avatarClip">
+            <circle cx="${AVATAR_SIZE / 2}" cy="${AVATAR_SIZE / 2}" r="${AVATAR_SIZE / 2}" />
+          </clipPath>
+        </defs>
+        <image
+          href="data:image/jpeg;base64,${catAvatar.toString('base64')}"
+          x="0"
+          y="0"
+          width="${AVATAR_SIZE}"
+          height="${AVATAR_SIZE}"
+          clip-path="url(#avatarClip)"
+          preserveAspectRatio="xMidYMid slice"
+        />
+      </svg>
+    `;
+
+    const avatarFrameSvg = `
+      <svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="300" cy="${HEIGHT / 2}" r="${AVATAR_SIZE / 2}" fill="none" stroke="${primaryColor}" stroke-width="8" />
+      </svg>
+    `;
+
+    const finalBuffer = await base
+      .composite([
+        {
+          input: Buffer.from(overlaySvg),
+          top: 0,
+          left: 0,
+        },
+        {
+          input: Buffer.from(avatarMaskSvg),
+          top: Math.round(HEIGHT / 2 - AVATAR_SIZE / 2),
+          left: Math.round(300 - AVATAR_SIZE / 2),
+        },
+        {
+          input: Buffer.from(avatarFrameSvg),
+          top: 0,
+          left: 0,
+        },
+      ])
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const filename = `cat_share_${id}.jpg`;
+    const s3Key = `cats/share/${filename}`;
+
+    const params = {
+      Bucket: S3_BUCKET,
+      Key: s3Key,
+      Body: finalBuffer,
+      ContentType: 'image/jpeg',
+      ACL: 'public-read'
+    };
+
+    const s3UploadResult = await s3.upload(params).promise();
+    const s3Url = s3UploadResult.Location;
+
+    return res.json({
+      id,
+      url: s3Url,
+    });
+  } catch (e) {
+    console.error('Error generating share preview:', e);
+    return res.status(500).json({ error: 'Failed to generate preview' });
+  }
+});
+
 app.post('/api/quiz', async (req, res) => {
   try {
     const { question_id, answer_id, answer } = req.body || {};
@@ -137,6 +329,10 @@ app.get('/draw-match', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/match.html'));
 });
 
+app.get('/cat-beauty', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/cat.html'));
+});
+
 app.get('/quiz/:id', async (req, res) => {
   try {
     res.set('Content-Type', 'text/html; charset=utf-8');
@@ -150,6 +346,15 @@ app.get('/punch/:id', async (req, res) => {
   try {
     res.set('Content-Type', 'text/html; charset=utf-8');
     return res.send(getPunchPage(req));
+  } catch(e) {
+    return res.status(500).send('Failed to load game', e);
+  }
+});
+
+app.get('/cat/:id', async (req, res) => {
+  try {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    return res.send(getCatPage(req));
   } catch(e) {
     return res.status(500).send('Failed to load game', e);
   }
@@ -180,6 +385,95 @@ app.get('/', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
 });
+
+function getCatPage(req) {
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Cat Beauty Contest</title>
+      <style>
+        #loadingIndicator {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 10px;
+          background-color: rgba(255, 255, 255, 0.8);
+          z-index: 1000;
+          pointer-events: none;
+        }
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+        .wrap { max-width: 800px; margin: 0 auto; }
+        a { color: #0366d6; text-decoration: none; }
+        .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+        .nav a { color: #0366d6; text-decoration: none; }
+        .nav a.active { font-weight: 600; }
+        .nav .links { display: flex; gap: .75rem; }
+        .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+        .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+        .hidden { display: none !important; }
+        .spinner {
+          border: 4px solid #f3f3f3; /* Light grey */
+          border-top: 4px solid #3498db; /* Blue */
+          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+    </head>
+    <body data-page-name="cat" data-game-id="${req.params.id}">
+      <div class="nav">
+        <div class="links">
+          <a href="/">New Game</a>
+          <a href="/leaderboard">Leaderboard</a>
+          <a href="/rules">Rules</a>
+        </div>
+        <div class="wallet">
+           <a href="/me"><span id="addr" style="opacity:.8"></span></a>
+          <button id="connectBtn" class="btn">Connect wallet</button>
+        </div>
+      </div>
+      <div class="wrap">
+        <h1 id="contestTitle">Beauty Contest</h1>
+        <div id="logoutContainer" class="hidden">
+          <p>Please connect your wallet first</p>
+        </div>
+        <div id="loginContainer" class="hidden">
+          <div id="emptyContainer" class="hidden">
+            <p>Contest not found</p>
+            <p>If the contest was created recently, try refreshing the page.</p>
+            <button id="refresh" class="btn" style="margin-top:1rem;">Refresh</button>
+          </div>
+          <div id="loadingIndicator" class="hidden">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+          </div>
+          <div id="gameContainer" class="hidden">
+            <div id="contestStatus" style="margin-top: 1rem; margin-bottom: 1rem;"></div>
+            <div id="leaderboard"></div>
+          </div>
+        </div>  
+      </div>
+      <script type="module" src="/wallet.js"></script>
+      <script>
+        const refreshBtn = document.getElementById('refresh');
+        if (refreshBtn) refreshBtn.addEventListener('click', async () => {
+          try {
+            if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+            WalletUI.checkPage();
+          } catch(e) { alert(e.message); }
+        });
+      </script>
+    </body>
+  </html>`
+}
 
 function getPunchPage(req) {
   return `<!doctype html>

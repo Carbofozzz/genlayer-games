@@ -134,6 +134,10 @@ class DrawMatch(gl.Contract):
         game_cache = self.active_games.get(sender_address)
         if game_cache is not None and game_cache.game_id == game_id:
             raise Exception("Game already created")
+        time_str = gl.message_raw["datetime"]
+        cache_active = game_cache is not None and not _check_time_due(game_cache, time_str)
+        if cache_active:
+            raise Exception("You have an unfinished game")
         if game_cache is not None and game_cache.game_id != game_id:
             scores = {k.as_hex: str(v.score) for k, v in game_cache.game_players.items()}
             answers = {k.as_hex: v.answer for k, v in game_cache.game_players.items()}
@@ -306,6 +310,19 @@ This result should be perfectly parsable by a JSON parser without errors.
                 raise Exception(game.get("error"))
             nicknames = StatIface(self.stat).view().get_nicknames()
             return json.dumps(_select_game(game, nicknames, gl.message.sender_address))
+        except Exception as e:
+            return json.dumps({ "error": str(e) })
+
+    @gl.public.view
+    def get_my_game(self) -> dict:
+        sender_address = gl.message.sender_address
+        game_cache = self.active_games.get(sender_address)
+        try:
+            if game_cache is not None:
+                game = game_cache.to_dict(False, gl.message_raw["datetime"]) 
+                nicknames = StatIface(self.stat).view().get_nicknames()
+                return json.dumps(_select_game(game, nicknames, sender_address))
+            return json.dumps({ "error": "Game not found" })
         except Exception as e:
             return json.dumps({ "error": str(e) })
 
