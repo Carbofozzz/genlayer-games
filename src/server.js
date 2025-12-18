@@ -461,7 +461,7 @@ function getCatPage(req) {
           </div>
         </div>  
       </div>
-      <script type="module" src="/wallet.js"></script>
+      <script type="module" src="/main.js"></script>
       <script>
         const refreshBtn = document.getElementById('refresh');
         if (refreshBtn) refreshBtn.addEventListener('click', async () => {
@@ -575,7 +575,7 @@ function getPunchPage(req) {
           </div>
         </div>  
       </div>
-      <script type="module" src="/wallet.js"></script>
+      <script type="module" src="/main.js"></script>
       <script>
         const area = document.getElementById('answer');
         const clearBtn = document.getElementById('clearAnswer');
@@ -704,7 +704,7 @@ function getQuizPage(req) {
           </div>
         </div>  
       </div>
-      <script type="module" src="/wallet.js"></script>
+      <script type="module" src="/main.js"></script>
       <script>
         const refreshBtn = document.getElementById('refresh');
         if (refreshBtn) refreshBtn.addEventListener('click', async () => {
@@ -862,7 +862,7 @@ function getGuessPage(req, type, mode) {
         </div>
       </div>  
     </div>
-    <script type="module" src="/wallet.js"></script>
+    <script type="module" src="/main.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@5.1.1/dist/signature_pad.umd.min.js"></script>
     <script>
       const area = document.getElementById('answer');
