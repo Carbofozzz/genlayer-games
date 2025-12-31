@@ -1,4 +1,8 @@
 import { maskAddress, fmt, getAddress } from './core.js';
+import { getGame } from './game-guess.js';
+import { getGameMatch } from './game-match.js';
+import { getGamePunch } from './game-punch.js';
+import { getGameCook } from './game-cook.js';
 
 function renderGame(state, game) {
     const loadingIndicator = document.getElementById('loadingIndicator');
@@ -200,6 +204,85 @@ function renderGamePunch(state, game) {
     }
   }
 
+function renderGameCook(state, game) {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const dataContainer = document.getElementById('gameContainer');
+    const emptyContainer = document.getElementById('emptyContainer');
+    switch (state) {
+      case 0:
+        loadingIndicator.classList.remove('hidden');
+        dataContainer.classList.add('hidden');
+        emptyContainer.classList.add('hidden');
+        break;
+      case 1:
+        loadingIndicator.classList.add('hidden');
+        dataContainer.classList.remove('hidden');
+        emptyContainer.classList.add('hidden');
+        const padTheme = document.getElementById('game_theme');
+        const timer = document.getElementById('timer');
+        const players = document.getElementById('players');
+        const answers = document.getElementById('answers');
+        const task = document.getElementById('task');
+
+        padTheme.textContent = "You have " + game.game_ingredients.join(", ") + ". What will you cook?";
+        padTheme.classList.remove('hidden');
+
+        const myAddr = (getAddress() || '').toLowerCase().trim();
+        const playersArr = Array.isArray(game.game_players) ? game.game_players : [];
+
+        const alreadyPlayed = playersArr.some(p => {
+          return (p.address || '').toLowerCase().trim() === myAddr;
+        });
+   
+        if (game.game_time_left) {
+          players.classList.add('hidden');
+          if (alreadyPlayed) {
+            answers.style.display = 'none';
+            task.classList.remove('hidden');
+            task.textContent = "You have already sent a recipe";
+            task.style.padding = '16px 0';
+          } else {
+            answers.style.display = 'block';
+            task.classList.add('hidden');
+            task.textContent = "";
+          }
+          timer.classList.remove('hidden');
+          timer.style.padding = '8px 0';
+          if (window.dftWidgetTimer) {
+            clearInterval(window.dftWidgetTimer);
+            window.dftWidgetTimer = null;
+          }
+          let secs = 0;
+          secs = Math.round(Number(game.game_time_left));
+          timer.style.color = '#6b7280';
+          timer.textContent = 'Game finish in ' + fmt(secs);
+          window.dftWidgetTimer = setInterval(()=>{ 
+            secs-=1; 
+            if (secs<=0){ 
+              clearInterval(window.dftWidgetTimer); 
+              window.dftWidgetTimer = null; 
+              timer.textContent='Finished';
+              getGameCook(game.game_id);
+            } else { 
+              timer.textContent = 'Game finish in ' + fmt(secs);
+            } 
+          }, 1000); 
+        } else {
+          players.classList.remove('hidden');
+          answers.style.display = 'none';
+          timer.classList.add('hidden');
+          task.classList.add('hidden');
+          showPlayers(game.game_players, 7)
+        }
+        break;
+      case 2:
+        loadingIndicator.classList.add('hidden');
+        dataContainer.classList.add('hidden');
+        emptyContainer.classList.remove('hidden');
+        break;
+    }
+  }
+
 function showPlayers(items, type) {
     const root = document.getElementById('players');
     if (!root) return;
@@ -309,6 +392,11 @@ function showPlayers(items, type) {
           answerEl.textContent = "Joke: " + String(item.answer);
           answerEl.style.fontSize = '13px';
           left.appendChild(answerEl);
+        } else if (type == 7) {
+          const answerEl = document.createElement('div');
+          answerEl.textContent = "Recipe: " + String(item.answer);
+          answerEl.style.fontSize = '13px';
+          left.appendChild(answerEl);
         } else {
           const answerEl = document.createElement('img');
           answerEl.src = item.answer;
@@ -334,5 +422,6 @@ function showPlayers(items, type) {
 export {
   renderGame,
   renderGamePunch,
+  renderGameCook,
   showPlayers,
 };

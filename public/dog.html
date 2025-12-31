@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DogBeauty - a game powered by the GenLayer intelligent contract</title>
+    <style>
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+      .wrap { max-width: 800px; margin: 0 auto; }
+      h1 { margin: 0 0 1rem; }
+      code { background: #f2f2f2; padding: .2rem .4rem; border-radius: 4px; }
+      .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .nav a { color: #0366d6; text-decoration: none; }
+      .nav a.active { font-weight: 600; }
+      .nav .links { display: flex; gap: .75rem; }
+      .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+      .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+      .field { margin-top: 1rem; }
+      .field label {
+        display: block;
+        font-size: 13px;
+        margin-bottom: .25rem;
+        color: #333;
+      }
+      .field input[type="text"], .field select { width: 100%; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
+      .row { margin-top: .5rem; display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+      .hidden { display: none !important; }
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-top-color: #0366d6;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      #preview {
+        margin-top: 1rem;
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+      }
+      small { display:block; color:#666; margin-top:.25rem; }
+      .file-wrapper {
+        display: inline-block;
+        position: relative;
+      }
+      #fileInput {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .file-label-btn {
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body data-page-name="start_dog">
+    <div class="nav">
+      <div class="links">
+        <a href="/">New Game</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/rules">Rules</a>
+      </div>
+      <div class="wallet">
+        <a href="/me"><span id="addr" style="opacity:.8"></span></a>
+        <button id="connectBtn" class="btn">Connect wallet</button>
+      </div>
+    </div>
+    <div class="wrap">
+        <h1>Join the DogBeauty contest</h1>
+        <p>Select a photo of your dog and take part in the contest.</p>
+  
+        <div class="field">
+          <label for="theme">Dog's nickname</label>
+          <input type="text" id="theme" placeholder="Type dog's nick..." maxlength="20" />
+        </div>
+    
+        <div class="field">
+          <label for="fileInput">Dog photo</label>
+          <div class="file-wrapper">
+            <button type="button" class="btn file-label-btn">Choose dog photo</button>
+            <input type="file" id="fileInput" accept="image/*" />
+          </div>
+          <small>Max a few megabytes; will be compressed on the server.</small>
+          <img id="preview" class="hidden" alt="Preview of selected dog photo" />
+        </div>
+
+        <div class="field">
+          <label for="theme">Dog's beauty contest</label>
+          <select id="contestSelect" aria-label="Beauty contest"></select>
+        </div>
+  
+        <div class="row" style="margin-top:1rem;">
+          <button id="saveBtn" class="btn">Join contest</button>
+          <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
+        </div>
+
+        <div id="current"></div>
+
+        <div id="history"></div>
+    </div>
+    <script type="module" src="/main.js"></script>
+    <script>
+      const themeInput = document.getElementById('theme');
+      const fileInput = document.getElementById('fileInput');
+      const previewImg = document.getElementById('preview');
+      const submitBtn = document.getElementById('saveBtn');
+      const progress = document.getElementById('saveProgress');
+      const select = document.getElementById('contestSelect');
+
+      let selectedDataUrl = null;
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files && fileInput.files[0];
+        selectedDataUrl = null;
+        previewImg.classList.add('hidden');
+        previewImg.src = '';
+
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+          alert('Please select an image file');
+          fileInput.value = '';
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = e => {
+          selectedDataUrl = e.target.result;
+          previewImg.src = selectedDataUrl;
+          previewImg.classList.remove('hidden');
+        };
+        reader.onerror = () => {
+          alert('Failed to read the file');
+        };
+        reader.readAsDataURL(file);
+      });
+      if (submitBtn) submitBtn.addEventListener('click', async () => {
+        try {
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          if (!WalletUI.nickIsSet()) throw new Error('Please provide your Discord nickname first.');
+        } catch (e) { 
+          alert(e.message); 
+          window.location.href = `/me`;
+          return; 
+        }
+        if (!selectedDataUrl) {
+          alert('Please select a dog photo first');
+          return;
+        }
+        const value = (themeInput && themeInput.value || '').trim();
+        if (!value) { alert('Please enter the dog\'s nick'); return; }
+        const contestId = select.value;
+        submitBtn.classList.add('hidden');
+        progress.classList.remove('hidden');
+        try {
+          const res = await fetch('/api/contest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dataUrl: selectedDataUrl })
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || 'Save failed');
+          console.log("Picture ", json)
+          console.log("Contest ", contestId)
+          WalletUI.dogBeauty(json.url, value, contestId);
+        } catch (e) {
+          alert(e.message);
+          submitBtn.classList.remove('hidden');
+          progress.classList.add('hidden');
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CookItUp - a game powered by the GenLayer intelligent contract</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+      .wrap { max-width: 800px; margin: 0 auto; }
+      h1 { margin: 0 0 1rem; }
+      code { background: #f2f2f2; padding: .2rem .4rem; border-radius: 4px; }
+      .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .nav a { color: #0366d6; text-decoration: none; }
+      .nav a.active { font-weight: 600; }
+      .match a { color: #0366d6; text-decoration: none; }
+      .nav .links { display: flex; gap: .75rem; }
+      .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+      .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+      .theme { margin-top: 1rem; }
+      .theme select { width: 100%; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; width: 200px;}
+      .theme .row { margin-top: .5rem; display: flex; gap: .5rem; flex-wrap: wrap; } 
+      .hidden { display: none !important; }
+      .theme .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-top-color: #0366d6;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body data-page-name="start_cook">
+    <div class="nav">
+      <div class="links">
+        <a href="/">New Game</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/rules">Rules</a>
+      </div>
+      <div class="wallet">
+        <a href="/me"><span id="addr" style="opacity:.8"></span></a>
+        <button id="connectBtn" class="btn">Connect wallet</button>
+      </div>
+    </div>
+    <div class="wrap">
+      <h1>Create a CookItUp game</h1>
+      <p>Set a language for the task and start the game.</p>
+      <div class="theme" style="margin-top:1rem; gap:.5rem;">
+        <select id="languageSelect" aria-label="Game language"></select>
+        <div class="row">
+            <button id="saveBtn" class="btn">Create game</button>
+            <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
+        </div>
+        <p id="game_link_p" class="match hidden"><a id="game_link" href="">The Game page</a></p>
+      </div>
+    </div>
+    <script type="module" src="/main.js"></script>
+    <script>
+      const select = document.getElementById('languageSelect');
+      const submitBtn = document.getElementById('saveBtn');
+      
+      if (submitBtn) submitBtn.addEventListener('click', async () => {
+        try {
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          if (!WalletUI.nickIsSet()) throw new Error('Please provide your Discord nickname first.');
+        } catch (e) { 
+          alert(e.message); 
+          window.location.href = `/me`;
+          return; 
+        }
+        try {
+          const gameLang = languages.find(l => l.code === select.value)?.name || select.value;
+          WalletUI.gameCook(gameLang);
+        } catch(e) { alert(e.message); }
+      });
+      const languages = [
+        { code: "en", name: "English" },
+        { code: "es", name: "Spanish" },
+        { code: "fr", name: "French" },
+        { code: "de", name: "German" },
+        { code: "it", name: "Italian" },
+        { code: "pt", name: "Portuguese" },
+        { code: "ru", name: "Russian" },
+        { code: "zh", name: "Chinese" },
+        { code: "ja", name: "Japanese" },
+        { code: "ko", name: "Korean" },
+        { code: "ar", name: "Arabic" },
+        { code: "hi", name: "Hindi" },
+        { code: "tr", name: "Turkish" },
+        { code: "vi", name: "Vietnamese" },
+        { code: "fa", name: "Persian" },
+        { code: "pl", name: "Polish" },
+        { code: "uk", name: "Ukrainian" },
+        { code: "nl", name: "Dutch" },
+        { code: "sv", name: "Swedish" },
+        { code: "no", name: "Norwegian" },
+        { code: "da", name: "Danish" },
+        { code: "fi", name: "Finnish" },
+        { code: "cs", name: "Czech" },
+        { code: "sk", name: "Slovak" },
+        { code: "ro", name: "Romanian" },
+        { code: "el", name: "Greek" },
+        { code: "he", name: "Hebrew" },
+        { code: "th", name: "Thai" },
+        { code: "id", name: "Indonesian" },
+        { code: "sr", name: "Serbian" },
+        { code: "hr", name: "Croatian" },
+        { code: "bg", name: "Bulgarian" },
+        { code: "hu", name: "Hungarian" },
+        { code: "lt", name: "Lithuanian" },
+        { code: "lv", name: "Latvian" },
+        { code: "et", name: "Estonian" },
+        { code: "sl", name: "Slovenian" },
+        { code: "is", name: "Icelandic" },
+        { code: "ga", name: "Irish" },
+        { code: "mt", name: "Maltese" },
+        { code: "sq", name: "Albanian" },
+        { code: "mk", name: "Macedonian" },
+        { code: "bs", name: "Bosnian" },
+        { code: "mn", name: "Mongolian" },
+        { code: "ka", name: "Georgian" },
+        { code: "hy", name: "Armenian" },
+        { code: "az", name: "Azerbaijani" },
+        { code: "kk", name: "Kazakh" },
+        { code: "uz", name: "Uzbek" },
+        { code: "tg", name: "Tajik" },
+        { code: "tk", name: "Turkmen" }
+      ];
+
+      const LANG_STORAGE_KEY = 'cook_lang';
+
+      function populateLanguages(list) {
+        select.innerHTML = '';
+        const frag = document.createDocumentFragment();
+        list.forEach(({ code, name }) => {
+          const opt = document.createElement('option');
+          opt.value = code;
+          opt.textContent = name;
+          frag.appendChild(opt);
+        });
+        select.appendChild(frag);
+      }
+
+      function getBrowserIso() {
+        const nav = navigator.language || navigator.userLanguage;
+        return (nav && nav.split('-')[0]) || 'en';
+      }
+
+      function getStoredLang() {
+        try { return localStorage.getItem(LANG_STORAGE_KEY) || ''; } catch { return ''; }
+      }
+
+      function setStoredLang(code) {
+        try { localStorage.setItem(LANG_STORAGE_KEY, code); } catch {}
+      }
+
+      function initLanguageSelector() {
+        populateLanguages(languages);
+
+        const stored = getStoredLang();
+        const browserIso = getBrowserIso();
+        const preferred = stored || browserIso;
+        const found = languages.find(l => l.code === preferred) || languages.find(l => l.code === 'en');
+
+        if (found) select.value = found.code;
+
+        select.addEventListener('change', () => {
+          const code = select.value;
+          setStoredLang(code);
+        });
+
+        setStoredLang(select.value);
+      }
+
+      function getSelectedLangCode() {
+        return select.value;
+      }
+
+      function getSelectedLangName() {
+        return languages.find(l => l.code === select.value)?.name || '';
+      }
+
+      initLanguageSelector();
+    </script>
+  </body>
+</html>

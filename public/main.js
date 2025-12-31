@@ -9,15 +9,17 @@ import {
     nickIsSet,
     setCheckPageImpl,
     checkPage,
-  } from './core.js';
+  } from './js/core.js';
   
-  import { gameGuess, answer } from './game-guess.js';
-  import { gameMatch, answerMatch } from './game-match.js';
-  import { gamePunch, joke } from './game-punch.js';
-  import { gameQuiz, answerQuiz, sendQuizAnswer } from './game-quiz.js';
-  import { catBeauty, getContest, getShareImage } from './contest.js';
-  import { setNickname } from './leaderboard.js';
-  import { checkPageImpl } from './pages.js';
+  import { gameGuess, answer } from './js/game-guess.js';
+  import { gameMatch, answerMatch } from './js/game-match.js';
+  import { gamePunch, joke } from './js/game-punch.js';
+  import { gameCook, answerCook } from './js/game-cook.js';
+  import { gameQuiz, answerQuiz, sendQuizAnswer } from './js/game-quiz.js';
+  import { catBeauty, getContest, getShareImage } from './js/contest.js';
+  import { dogBeauty, getDogContest, getDogShareImage } from './js/contest-dog.js';
+  import { setNickname } from './js/leaderboard.js';
+  import { checkPageImpl } from './js/pages.js';
   
   setCheckPageImpl(checkPageImpl);
   
@@ -33,15 +35,20 @@ import {
     gamePunch,
     gameGuess,
     gameMatch,
+    gameCook,
     gameQuiz,
     joke,
     answer,
     answerMatch,
+    answerCook,
     answerQuiz,
     sendQuizAnswer,
     getShareImage,
     catBeauty,
     getContest,
+    getDogShareImage,
+    dogBeauty,
+    getDogContest,
     setNickname,
     checkPage
   };

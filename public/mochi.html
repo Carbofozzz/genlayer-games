@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CookItUp - a game powered by the GenLayer intelligent contract</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+      .wrap { max-width: 800px; margin: 0 auto; }
+      h1 { margin: 0 0 1rem; }
+      code { background: #f2f2f2; padding: .2rem .4rem; border-radius: 4px; }
+      .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .nav a { color: #0366d6; text-decoration: none; }
+      .nav a.active { font-weight: 600; }
+      .match a { color: #0366d6; text-decoration: none; }
+      .nav .links { display: flex; gap: .75rem; }
+      .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+      .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+      .theme { margin-top: 1rem; }
+      .theme input { width: 100%; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
+      .theme .row { margin-top: .5rem; display: flex; gap: .5rem; flex-wrap: wrap; } 
+      .hidden { display: none !important; }
+      .theme .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-top-color: #0366d6;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body data-page-name="start_cook">
+    <div class="nav">
+      <div class="links">
+        <a href="/">New Game</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/rules">Rules</a>
+      </div>
+      <div class="wallet">
+        <a href="/me"><span id="addr" style="opacity:.8"></span></a>
+        <button id="connectBtn" class="btn">Connect wallet</button>
+      </div>
+    </div>
+    <div class="wrap">
+      <h1>Create a CookItUp game</h1>
+      <p>Set a theme for the drawing and start the game.</p>
+      <div class="theme" style="margin-top:1rem; gap:.5rem;">
+        <input type="text" id="theme" placeholder="Type your theme..." maxlength="20"/>
+        <div class="row">
+            <button id="clearBtn" class="btn">Clear</button>
+            <button id="saveBtn" class="btn">Create game</button>
+            <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
+        </div>
+        <p id="game_link_p" class="match hidden"><a id="game_link" href="">The Quiz page</a></p>
+      </div>
+      <div id="mochiContainer" style="width: 400px;"></div>
+    </div>
+    <script type="module" src="/main.js"></script>
+    <script>
+      async function loadMochiSvg() {
+  const res = await fetch('/img/mochi.svg');
+  const svgText = await res.text();
+
+  // Вставляем как HTML
+  const container = document.getElementById('mochiContainer');
+  container.innerHTML = svgText;
+
+  // Находим сам svg
+  const svg = container.querySelector('svg');
+  svg.id = 'mochiSvg';
+
+}
+
+// вызвать при загрузке
+loadMochiSvg();
+  // Функция линейного смешивания двух цветов (0–1)
+  function lerpColor(col1, col2, t) {
+    const c1 = hexToRgb(col1);
+    const c2 = hexToRgb(col2);
+    const r = Math.round(c1.r + (c2.r - c1.r) * t);
+    const g = Math.round(c1.g + (c2.g - c1.g) * t);
+    const b = Math.round(c1.b + (c2.b - c1.b) * t);
+    return rgbToHex(r, g, b);
+  }
+
+  function hexToRgb(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) {
+      hex = hex.split('').map(c => c + c).join('');
+    }
+    const num = parseInt(hex, 16);
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255
+    };
+  }
+
+  function rgbToHex(r, g, b) {
+    const toHex = (v) => ('0' + v.toString(16)).slice(-2);
+    return '#' + toHex(r) + toHex(g) + toHex(b);
+  }
+
+  let rafId = null;
+  let startTime = null;
+  let elements = [];
+  let elementsGrid = [];
+  let baseColors = [];
+  let baseGridColors = [];
+
+  const RED_COLOR = '#ff0000';
+  const DARK_RED_COLOR = '#7a0018';
+  const PERIOD = 3000; // полный цикл "туда-обратно" в мс
+
+  function animate(timestamp) {
+    if (!startTime) startTime = timestamp;
+    const elapsed = timestamp - startTime;
+
+    // Нормализованный параметр 0..1..0 для пульса
+    const phase = (elapsed % PERIOD) / PERIOD; // 0..1
+    let t = phase <= 0.5 ? phase * 2 : (1 - phase) * 2; // 0→1→0
+
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      const base = baseColors[i];
+      const mix = lerpColor(base, RED_COLOR, t);
+      el.setAttribute('fill', mix);
+    }
+    for (let i = 0; i < elementsGrid.length; i++) {
+      const el = elementsGrid[i];
+      const base = baseGridColors[i];
+      const mix = lerpColor(base, DARK_RED_COLOR, t);
+      el.setAttribute('fill', mix);
+    }
+
+    rafId = requestAnimationFrame(animate);
+  }
+
+  function initElements() {
+    const svg = document.getElementById('mochiSvg');
+    if (!svg) return;
+    elements = Array.from(svg.querySelectorAll('.fill'));
+    elementsGrid = Array.from(svg.querySelectorAll('.grid'));
+    console.log("grid", elementsGrid.length)
+
+    baseColors = elements.map(el => {
+      let fill = el.getAttribute('fill');
+      if (!fill || fill === 'none') {
+        fill = '#ffffff';
+      }
+      return fill;
+    });
+    baseGridColors = elementsGrid.map(el => {
+      let fill = el.getAttribute('fill');
+      if (!fill || fill === 'none') {
+        fill = '#ffffff';
+      }
+      return fill;
+    });
+    console.log("initElements");
+  }
+
+  function startMochiPulse() {
+    if (rafId != null) return; // уже запущено
+    initElements();
+    startTime = null;
+    rafId = requestAnimationFrame(animate);
+    console.log("inited");
+  };
+
+  function stopMochiPulse() {
+    if (rafId != null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    for (let i = 0; i < elements.length; i++) {
+      elements[i].setAttribute('fill', baseColors[i]);
+    }
+    for (let i = 0; i < elementsGrid.length; i++) {
+        elementsGrid[i].setAttribute('fill', baseGridColors[i]);
+    }
+  };
+  const clearBtn = document.getElementById('clearBtn');
+  if (clearBtn) clearBtn.addEventListener('click', () => { 
+    console.log("anim");
+    startMochiPulse();
+ });
+
+      const area = document.getElementById('theme');
+      
+      const submitBtn = document.getElementById('saveBtn');
+      
+      if (submitBtn) submitBtn.addEventListener('click', async () => {
+        stopMochiPulse();
+      });
+    </script>
+  </body>
+</html>

@@ -69,6 +69,12 @@ import {
       } else if (item.game_type == "5") {
         a.href = '/cat/' + item.id;
         a.textContent = "CatBeauty (" + item.id + ")";
+      } else if (item.game_type == "6") {
+        a.href = '/dog/' + item.id;
+        a.textContent = "DogBeauty (" + item.id + ")";
+      } else if (item.game_type == "7") {
+        a.href = '/cook/' + item.id;
+        a.textContent = "CookItUp (" + item.id + ")";
       } else {
         a.textContent = item.id;
       }

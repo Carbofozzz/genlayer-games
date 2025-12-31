@@ -17,7 +17,7 @@ import {
       tab.addEventListener('click', () => {
         const name = tab.dataset.tab;
         tabs.forEach(t => t.classList.toggle('lb-tab-active', t === tab));
-        ['overall', 'guess', 'match', 'quiz', 'punch', 'verse'].forEach(key => {
+        ['overall', 'guess', 'match', 'quiz', 'punch', 'cook'].forEach(key => {
           const el = document.getElementById('leaderboard-' + key);
           if (el) el.style.display = key === name ? '' : 'none';
         });
@@ -30,8 +30,8 @@ import {
           getLeaderboardMatch();
         } else if (name === 'punch') {
           getLeaderboardPunch();
-        } else if (name === 'verse') {
-          getLeaderboardVerse();
+        } else if (name === 'cook') {
+          getLeaderboardCook();
         }
       });
     });
@@ -142,6 +142,27 @@ import {
       renderLeaderboard('leaderboard-guess', sorted);
     } catch (error) {
       console.error('Error getting leaderboard guess:', error);
+    }
+  }
+
+  async function getLeaderboardCook() {
+    if (!client) return;
+    try {
+      const rating = await client.readContract({
+        address: contractStat,
+        functionName: 'get_points_by_game',
+        args: [7, 50],
+      });
+      let res = JSON.parse(rating);
+      console.error('Success getting leaderboard cook: ', res);
+      const sorted = [...res].sort((a, b) => {
+        const pointsA = Number(a.points) || 0;
+        const pointsB = Number(b.points) || 0;
+        return pointsB - pointsA;
+      });
+      renderLeaderboard('leaderboard-cook', sorted);
+    } catch (error) {
+      console.error('Error getting leaderboard cook:', error);
     }
   }
 

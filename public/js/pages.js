@@ -1,8 +1,10 @@
 import { getGame, getMyGuess } from './game-guess.js';
 import { getGameMatch, getMyMatch } from './game-match.js';
 import { getGamePunch, getMyPunch } from './game-punch.js';
+import { getGameCook, getMyCook } from './game-cook.js';
 import { getGameQuiz, getMyQuiz } from './game-quiz.js';
 import { getContest, getContests } from './contest.js';
+import { getDogContest, getDogContests } from './contest-dog.js';
 import { getGames } from './profile.js';
 import { initLeaderboardTabs } from './leaderboard.js';
 
@@ -27,11 +29,20 @@ function checkPageImpl() {
       case 'cat':
         getContest(document.body.dataset.gameId);
         break;
+      case 'dog':
+        getDogContest(document.body.dataset.gameId);
+        break;
+      case 'cook':
+        getGameCook(document.body.dataset.gameId);
+        break;
       case 'start_quiz':
         getMyQuiz();
         break;
       case 'start_punch':
         getMyPunch();
+        break;
+      case 'start_cook':
+        getMyCook();
         break;
       case 'start_guess':
         getMyGuess();
@@ -41,6 +52,9 @@ function checkPageImpl() {
         break;
       case 'start_cat':
         getContests();
+        break;
+      case 'start_dog':
+        getDogContests();
         break;
       case 'profile':
         getGames();

@@ -12,6 +12,8 @@ let contractMatch = '0xfe3D363FCd13c79541B802F09e92Ef5B67F169D6';
 let contractQuiz = '0xA23B1b240903d7a9b85b7878139f936DDA6Bd820';
 let contractPunch = '0x51eD95A3c625A8eAE5e7ED87Cc586ec54220c718';
 let contractBeauty = '0x41c4EbE0eFDe4b526c6301cC365ff7625D7be84E';
+let contractDogBeauty = '0x8017a5a51061B1e68B9c7c6e0b912722AFFbeE17';
+let contractCook = '0x79fCa43f7B31Cf2C4406c8d736861a0651d60322';
 
 const FLAG_KEY = 'answeredFlags';
 
@@ -196,6 +198,8 @@ function getChangedIds() {
     contractQuiz,
     contractPunch,
     contractBeauty,
+    contractDogBeauty,
+    contractCook,
     maskAddress,
     markChanged,
     clearChanged,
