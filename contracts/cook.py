@@ -111,7 +111,19 @@ class Cook(gl.Contract):
     @gl.public.write
     def create_game_duration(self, game_id: str, lang: str, duration: int) -> None:
         sender_address = gl.message.sender_address
+        game_cache = self.active_games.get(sender_address)
+        game_archive = StorageIface(self.storage).view().get_game(game_id)
+        if game_id == game_archive.get("game_id", ""):
+            raise Exception("Game already created")
+        if game_cache is not None and game_cache.game_id == game_id:
+            raise Exception("Game already created")
         time_str = gl.message_raw["datetime"]
+        cache_active = game_cache is not None and not _check_time_due(game_cache, time_str)
+        if cache_active:
+            raise Exception("You have an unfinished game")
+        if game_cache is not None:
+            StorageIface(self.storage).emit().add_game(game_cache.to_dict(time_str))
+        
         def leader_fn():
             task_prompt = f"""
 Choose four cooking ingredients that can be used in a recipe.
@@ -204,14 +216,20 @@ This result should be perfectly parsable by a JSON parser without errors.
             task_prompt = f"""
 Check {game_answer} against the following criteria. 
 First, determine that it's a cooking recipe, not just words like "stir and fry," but a complete recipe for preparing a dish. 
-Second, ensure that the recipe uses only these ingredients: water, {ingredient_1}, {ingredient_2}, {ingredient_3}, {ingredient_4}. 
+Second, ensure that the recipe uses only these ingredients: {ingredient_1}, {ingredient_2}, {ingredient_3}, {ingredient_4}. 
 Third, evaluate the correctness of the cooking process. Originality and uniqueness are also important.
 Rate this recipe on a scale of 0 to 6. 
 Scores are calculated as follows: 
-- realistic recipe (1 point), 
-- only ingredients listed (2 point), all listed ingredients and something more that not in list (1 point), 
-- correct cooking process (1 point), 
-- originality (2 point).
+- a realistic recipe that can be repeated (1 point),
+- all four ingredients from the list and only these four (4 points), 
+ingredients from the list are partially used (1 point for each ingredient), 
+an additional ingredient not on the list is added (penalty -1 point; only water or vegetable oil for frying can be added without penalty; 
+everything else, including spices, oil, etc., is penalized. The penalty cannot exceed the total points for that item, i.e., 
+if one ingredient from the list and five not on the list are used, the total score for the ingredients is 0),
+please note that the user may write the names of ingredients in the recipe with minor grammatical errors,
+- correct cooking process (1 point),
+- correct combination of flavors in the finished dish (1 point),
+- originality (1 point).
 
 Return a JSON with the name as follows:
 {{
