@@ -7,6 +7,7 @@ import { getContest, getContests } from './contest.js';
 import { getDogContest, getDogContests } from './contest-dog.js';
 import { getGames } from './profile.js';
 import { initLeaderboardTabs } from './leaderboard.js';
+import { getMyMochi } from './mochi.js';
 
 function checkPageImpl() {
     const pageName = document.body.dataset.pageName;
@@ -58,6 +59,9 @@ function checkPageImpl() {
         break;
       case 'profile':
         getGames();
+        break;
+      case 'mochi':
+        getMyMochi();
         break;
       default:
         console.log('Page has no data-page-name');

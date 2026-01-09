@@ -20,6 +20,7 @@ import {
   import { dogBeauty, getDogContest, getDogShareImage } from './js/contest-dog.js';
   import { setNickname } from './js/leaderboard.js';
   import { checkPageImpl } from './js/pages.js';
+  import { mintMochi, burnMochi, activateMochi, answerMochi } from './js/mochi.js';
   
   setCheckPageImpl(checkPageImpl);
   
@@ -50,7 +51,11 @@ import {
     dogBeauty,
     getDogContest,
     setNickname,
-    checkPage
+    checkPage,
+    mintMochi,
+    burnMochi,
+    activateMochi,
+    answerMochi
   };
   
   if (typeof window !== 'undefined') {

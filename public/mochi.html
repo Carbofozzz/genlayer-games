@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CookItUp - a game powered by the GenLayer intelligent contract</title>
+    <title>Mochi NFT - a game powered by the GenLayer intelligent contract</title>
     <style>
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
       .wrap { max-width: 800px; margin: 0 auto; }
@@ -16,11 +16,15 @@
       .nav .links { display: flex; gap: .75rem; }
       .nav .wallet { display: flex; gap: .5rem; align-items: center; }
       .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+      .btn.inline { padding: .2rem .4rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; font-size: 12px; margin-left: .5rem; }
+      .mochi-info select { padding: .2rem .4rem; font-family: inherit; font-size: 12px; border: 1px solid #ddd; border-radius: 6px; margin-left: .5rem; }
+      .answer { margin-top: 1rem; }
+      .answer textarea { width: 100%; height: 200px; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
+      .answer .row { margin-top: .5rem; display: flex; gap: .5rem; }
       .theme { margin-top: 1rem; }
-      .theme input { width: 100%; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
       .theme .row { margin-top: .5rem; display: flex; gap: .5rem; flex-wrap: wrap; } 
       .hidden { display: none !important; }
-      .theme .spinner {
+      .mochi-nft .spinner {
         width: 20px;
         height: 20px;
         border: 2px solid #ddd;
@@ -28,12 +32,40 @@
         border-radius: 50%;
         animation: spin .8s linear infinite;
       }
+      .mochi-layout {
+        display: flex;
+        align-items: flex-start;
+        gap: 1.5rem;
+        padding: 0.75rem 1rem;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+      .mochi-info {
+        min-width: 450px;
+        font-size: 16px;
+        line-height: 1.4;
+        padding: 0.75rem 0;
+      }
+      .mochi-nft {
+        min-width: 300px;
+        min-height: 300px;
+        border: 1px solid #ddd;
+        border-radius: 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+.mochi-info > div + div {
+  margin-top: 0.35rem;
+}
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
     </style>
   </head>
-  <body data-page-name="start_cook">
+  <body data-page-name="mochi">
     <div class="nav">
       <div class="links">
         <a href="/">New Game</a>
@@ -46,157 +78,185 @@
       </div>
     </div>
     <div class="wrap">
-      <h1>Create a CookItUp game</h1>
-      <p>Set a theme for the drawing and start the game.</p>
-      <div class="theme" style="margin-top:1rem; gap:.5rem;">
-        <input type="text" id="theme" placeholder="Type your theme..." maxlength="20"/>
-        <div class="row">
-            <button id="clearBtn" class="btn">Clear</button>
-            <button id="saveBtn" class="btn">Create game</button>
-            <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
+      <h1>Your Mochi NFT</h1>
+      <div class="mochi-layout">
+        <div class="mochi-nft">
+          <div id="mochiContainer" class="hidden" style="width:300px;display: flex; justify-content: center; align-items: center;"></div>
+          <button id="mintBtn" class="btn hidden">Mint</button>
+          <div id="mochiProgress" class="spinner hidden" aria-label="Loading"></div>
         </div>
-        <p id="game_link_p" class="match hidden"><a id="game_link" href="">The Quiz page</a></p>
+        <div id="mochiInfo" class="mochi-info">
+          <div><strong>ID:</strong> <span id="mochiId">—</span></div>
+          <div><strong>Level:</strong> <span id="mochiLevel">—</span></div>
+          <div><strong>Status:</strong> <span id="mochiStatus">—</span><button id="activateBtn" class="btn inline hidden">Start activation</button><select id="languageSelect" class="hidden" aria-label="Activation language"></select></div>
+          <div><strong>Primary skill:</strong> <span id="mochiPrimary">—</span></div>
+          <div><strong>Secondary skill:</strong> <span id="mochiSecondary">—</span></div>
+          <div class="row">
+            <button id="burnBtn" class="btn hidden">Drop</button>
+        </div>
+        </div>
       </div>
-      <div id="mochiContainer" style="width: 400px;"></div>
+      <div class="theme" style="margin-top:1rem; gap:.5rem;">
+        <p id="noteMochi">Mochi NFT is your gateway to the world of Mochi Games. Mint and start leveling up your NFT by solving challenges and completing AI-powered quests. Who will be the first to reach level 999?</p>
+      </div>
+      <div id="activationContainer" class="hidden">
+        <h2 id="question">Вопрос</h2>
+        <div id="answers" class="answer">
+          <textarea id="answer" placeholder="Type your answer..."></textarea>
+          <div class="row">
+            <button id="clearAnswer" class="btn" type="button">Clear</button>
+            <button id="submitAnswer" class="btn" type="button">Submit answer</button>
+          </div>
+        </div>
+      </div>
     </div>
     <script type="module" src="/main.js"></script>
     <script>
-      async function loadMochiSvg() {
-  const res = await fetch('/img/mochi.svg');
-  const svgText = await res.text();
-
-  // Вставляем как HTML
-  const container = document.getElementById('mochiContainer');
-  container.innerHTML = svgText;
-
-  // Находим сам svg
-  const svg = container.querySelector('svg');
-  svg.id = 'mochiSvg';
-
-}
-
-// вызвать при загрузке
-loadMochiSvg();
-  // Функция линейного смешивания двух цветов (0–1)
-  function lerpColor(col1, col2, t) {
-    const c1 = hexToRgb(col1);
-    const c2 = hexToRgb(col2);
-    const r = Math.round(c1.r + (c2.r - c1.r) * t);
-    const g = Math.round(c1.g + (c2.g - c1.g) * t);
-    const b = Math.round(c1.b + (c2.b - c1.b) * t);
-    return rgbToHex(r, g, b);
-  }
-
-  function hexToRgb(hex) {
-    hex = hex.replace('#', '');
-    if (hex.length === 3) {
-      hex = hex.split('').map(c => c + c).join('');
-    }
-    const num = parseInt(hex, 16);
-    return {
-      r: (num >> 16) & 255,
-      g: (num >> 8) & 255,
-      b: num & 255
-    };
-  }
-
-  function rgbToHex(r, g, b) {
-    const toHex = (v) => ('0' + v.toString(16)).slice(-2);
-    return '#' + toHex(r) + toHex(g) + toHex(b);
-  }
-
-  let rafId = null;
-  let startTime = null;
-  let elements = [];
-  let elementsGrid = [];
-  let baseColors = [];
-  let baseGridColors = [];
-
-  const RED_COLOR = '#ff0000';
-  const DARK_RED_COLOR = '#7a0018';
-  const PERIOD = 3000; // полный цикл "туда-обратно" в мс
-
-  function animate(timestamp) {
-    if (!startTime) startTime = timestamp;
-    const elapsed = timestamp - startTime;
-
-    // Нормализованный параметр 0..1..0 для пульса
-    const phase = (elapsed % PERIOD) / PERIOD; // 0..1
-    let t = phase <= 0.5 ? phase * 2 : (1 - phase) * 2; // 0→1→0
-
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i];
-      const base = baseColors[i];
-      const mix = lerpColor(base, RED_COLOR, t);
-      el.setAttribute('fill', mix);
-    }
-    for (let i = 0; i < elementsGrid.length; i++) {
-      const el = elementsGrid[i];
-      const base = baseGridColors[i];
-      const mix = lerpColor(base, DARK_RED_COLOR, t);
-      el.setAttribute('fill', mix);
-    }
-
-    rafId = requestAnimationFrame(animate);
-  }
-
-  function initElements() {
-    const svg = document.getElementById('mochiSvg');
-    if (!svg) return;
-    elements = Array.from(svg.querySelectorAll('.fill'));
-    elementsGrid = Array.from(svg.querySelectorAll('.grid'));
-    console.log("grid", elementsGrid.length)
-
-    baseColors = elements.map(el => {
-      let fill = el.getAttribute('fill');
-      if (!fill || fill === 'none') {
-        fill = '#ffffff';
-      }
-      return fill;
-    });
-    baseGridColors = elementsGrid.map(el => {
-      let fill = el.getAttribute('fill');
-      if (!fill || fill === 'none') {
-        fill = '#ffffff';
-      }
-      return fill;
-    });
-    console.log("initElements");
-  }
-
-  function startMochiPulse() {
-    if (rafId != null) return; // уже запущено
-    initElements();
-    startTime = null;
-    rafId = requestAnimationFrame(animate);
-    console.log("inited");
-  };
-
-  function stopMochiPulse() {
-    if (rafId != null) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
-    for (let i = 0; i < elements.length; i++) {
-      elements[i].setAttribute('fill', baseColors[i]);
-    }
-    for (let i = 0; i < elementsGrid.length; i++) {
-        elementsGrid[i].setAttribute('fill', baseGridColors[i]);
-    }
-  };
-  const clearBtn = document.getElementById('clearBtn');
-  if (clearBtn) clearBtn.addEventListener('click', () => { 
-    console.log("anim");
-    startMochiPulse();
- });
-
-      const area = document.getElementById('theme');
-      
-      const submitBtn = document.getElementById('saveBtn');
-      
-      if (submitBtn) submitBtn.addEventListener('click', async () => {
-        stopMochiPulse();
+      const select = document.getElementById('languageSelect');
+      const mintBtn = document.getElementById('mintBtn');
+      const activateBtn = document.getElementById('activateBtn');
+      const clearBtn = document.getElementById('clearAnswer');
+      const submitBtn = document.getElementById('submitAnswer');
+      const area = document.getElementById('answer');
+      if (clearBtn) clearBtn.addEventListener('click', () => { if (area) area.value=''; });
+      if (mintBtn) mintBtn.addEventListener('click', async () => {
+        try {
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          WalletUI.mintMochi();
+        } catch(e) { alert(e.message); }
       });
+      if (activateBtn) activateBtn.addEventListener('click', async () => {
+        try {
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          const gameLang = languages.find(l => l.code === select.value)?.name || select.value;
+          WalletUI.activateMochi(gameLang);
+        } catch(e) { alert(e.message); }
+      });
+      if (submitBtn) submitBtn.addEventListener('click', async () => {
+          try {
+            if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+          } catch (e) { 
+            alert(e.message); 
+            return; 
+          }
+          try {
+            const value = (area && area.value || '').trim();
+            if (!value) { alert('Please enter an answer'); return; }
+            WalletUI.answerMochi(value);
+          } catch(e) { alert(e.message); }
+        });
+        const languages = [
+        { code: "en", name: "English" },
+        { code: "es", name: "Spanish" },
+        { code: "fr", name: "French" },
+        { code: "de", name: "German" },
+        { code: "it", name: "Italian" },
+        { code: "pt", name: "Portuguese" },
+        { code: "ru", name: "Russian" },
+        { code: "zh", name: "Chinese" },
+        { code: "ja", name: "Japanese" },
+        { code: "ko", name: "Korean" },
+        { code: "ar", name: "Arabic" },
+        { code: "hi", name: "Hindi" },
+        { code: "tr", name: "Turkish" },
+        { code: "vi", name: "Vietnamese" },
+        { code: "fa", name: "Persian" },
+        { code: "pl", name: "Polish" },
+        { code: "uk", name: "Ukrainian" },
+        { code: "nl", name: "Dutch" },
+        { code: "sv", name: "Swedish" },
+        { code: "no", name: "Norwegian" },
+        { code: "da", name: "Danish" },
+        { code: "fi", name: "Finnish" },
+        { code: "cs", name: "Czech" },
+        { code: "sk", name: "Slovak" },
+        { code: "ro", name: "Romanian" },
+        { code: "el", name: "Greek" },
+        { code: "he", name: "Hebrew" },
+        { code: "th", name: "Thai" },
+        { code: "id", name: "Indonesian" },
+        { code: "sr", name: "Serbian" },
+        { code: "hr", name: "Croatian" },
+        { code: "bg", name: "Bulgarian" },
+        { code: "hu", name: "Hungarian" },
+        { code: "lt", name: "Lithuanian" },
+        { code: "lv", name: "Latvian" },
+        { code: "et", name: "Estonian" },
+        { code: "sl", name: "Slovenian" },
+        { code: "is", name: "Icelandic" },
+        { code: "ga", name: "Irish" },
+        { code: "mt", name: "Maltese" },
+        { code: "sq", name: "Albanian" },
+        { code: "mk", name: "Macedonian" },
+        { code: "bs", name: "Bosnian" },
+        { code: "mn", name: "Mongolian" },
+        { code: "ka", name: "Georgian" },
+        { code: "hy", name: "Armenian" },
+        { code: "az", name: "Azerbaijani" },
+        { code: "kk", name: "Kazakh" },
+        { code: "uz", name: "Uzbek" },
+        { code: "tg", name: "Tajik" },
+        { code: "tk", name: "Turkmen" }
+      ];
+
+      const LANG_STORAGE_KEY = 'mochi_lang';
+
+      function populateLanguages(list) {
+        select.innerHTML = '';
+        const frag = document.createDocumentFragment();
+        list.forEach(({ code, name }) => {
+          const opt = document.createElement('option');
+          opt.value = code;
+          opt.textContent = name;
+          frag.appendChild(opt);
+        });
+        select.appendChild(frag);
+      }
+
+      function getBrowserIso() {
+        const nav = navigator.language || navigator.userLanguage;
+        return (nav && nav.split('-')[0]) || 'en';
+      }
+
+      function getStoredLang() {
+        try { return localStorage.getItem(LANG_STORAGE_KEY) || ''; } catch { return ''; }
+      }
+
+      function setStoredLang(code) {
+        try { localStorage.setItem(LANG_STORAGE_KEY, code); } catch {}
+      }
+
+      function initLanguageSelector() {
+        populateLanguages(languages);
+
+        const stored = getStoredLang();
+        const browserIso = getBrowserIso();
+        const preferred = stored || browserIso;
+        const found = languages.find(l => l.code === preferred) || languages.find(l => l.code === 'en');
+
+        if (found) select.value = found.code;
+
+        select.addEventListener('change', () => {
+          const code = select.value;
+          setStoredLang(code);
+        });
+
+        setStoredLang(select.value);
+      }
+
+      function getSelectedLangCode() {
+        return select.value;
+      }
+
+      function getSelectedLangName() {
+        return languages.find(l => l.code === select.value)?.name || '';
+      }
+
+      initLanguageSelector();
     </script>
   </body>
 </html>

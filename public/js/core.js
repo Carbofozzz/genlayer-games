@@ -14,6 +14,7 @@ let contractPunch = '0x51eD95A3c625A8eAE5e7ED87Cc586ec54220c718';
 let contractBeauty = '0x41c4EbE0eFDe4b526c6301cC365ff7625D7be84E';
 let contractDogBeauty = '0x8017a5a51061B1e68B9c7c6e0b912722AFFbeE17';
 let contractCook = '0x79fCa43f7B31Cf2C4406c8d736861a0651d60322';
+let contractMochi = '0xdD7e61ac3F40fd64A122D41a40ce262616146604';
 
 const FLAG_KEY = 'answeredFlags';
 
@@ -200,6 +201,7 @@ function getChangedIds() {
     contractBeauty,
     contractDogBeauty,
     contractCook,
+    contractMochi,
     maskAddress,
     markChanged,
     clearChanged,
