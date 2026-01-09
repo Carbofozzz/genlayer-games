@@ -118,8 +118,55 @@ class MochiNFT(gl.Contract):
             raise Exception("Your activation has not been yet created")
         if activation is not None and len(activation.score) == 5:
             raise Exception("Your activation has been already completed")
-        question = activation.questions[activation.current + 1]
-        
+        step = activation.current + 1
+        question = activation.questions[step]
+        criteria = """
+Logician: compares options, uses “if…, then…”, lists criteria, evaluates risks and assumptions.
+Tactician: proposes a concrete action plan (steps, deadlines, who does what), little theory.
+Inventor: offers an unconventional or combined solution, reframes the problem.
+Empath: pays attention to people, their feelings, trust, and motivation.
+        """
+        def leader_fn():
+            task = f"""
+You are a system for evaluating a player’s thinking style.
+You are given a user’s answer {answer} to a problem situation {question}.
+Your task is to assign scores from 0 to 10 for each of the 4 thinking classes:
+- Logician
+- Tactician
+- Inventor
+- Empath
+
+Criteria:
+{criteria}
+
+Return a JSON with the name as follows:
+{{
+    "logician": int,
+    "tactician": int,
+    "inventor": int,
+    "empath": int
+}}
+It is mandatory that you respond only using the JSON format above,
+nothing else. Don't include any other words or characters,
+your output must be only JSON without any formatting prefix or suffix.
+This result should be perfectly parsable by a JSON parser without errors.
+            """
+            result = gl.nondet.exec_prompt(task)
+            return json.loads(_extract_json_from_string(result))
+        def validator_fn(
+            leader_score: gl.vm.Result,
+        ) -> bool:
+            if not isinstance(leader_score, gl.vm.Return):
+                return False
+            leader_res = leader_score.calldata
+            validator_res = leader_fn()
+            leader_score = leader_res["logician"]
+            validator_score = validator_res["logician"]
+            if validator_score == 0 or leader_score == 0:
+                return validator_score == leader_score
+            return abs(validator_score - leader_score) <= 2
+
+        result_ai = gl.vm.run_nondet(leader_fn, validator_fn)          
 
     @gl.public.write
     def create_activation(self, lang: str):
