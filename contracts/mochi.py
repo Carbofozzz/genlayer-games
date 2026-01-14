@@ -113,7 +113,8 @@ class MochiNFT(gl.Contract):
 
     @gl.public.write
     def answer_activation(self, answer: str):
-        activation = self.activations.get(gl.message.sender_address, None)
+        sender_address = gl.message.sender_address
+        activation = self.activations.get(sender_address, None)
         if activation is None or len(activation.questions) != 5:
             raise Exception("Your activation has not been yet created")
         if activation is not None and len(activation.score) == 5:
@@ -126,6 +127,34 @@ Tactician: proposes a concrete action plan (steps, deadlines, who does what), li
 Inventor: offers an unconventional or combined solution, reframes the problem.
 Empath: pays attention to people, their feelings, trust, and motivation.
         """
+        if step == 2:
+            criteria = """
+Logician: includes reasoning for the choice, comparison of options, and mention of priorities and criteria.
+Tactician: features a clear step-by-step plan, specified actions, sequence, potential tools, and deadlines.
+Inventor: presents unusual formats such as gamified, experimental, or unconventional resources.
+Empath: emphasizes interaction with people, feedback, emotions, and support.
+            """
+        if step == 3:
+            criteria = """
+Logician: whether there is an explanation of why the proposed method should work (reasons, mechanisms).
+Tactician: whether this can realistically be executed step by step, presence of specific details.
+Inventor: the extent to which ideas are unconventional, original, or use gamified and unexpected formats.
+Empath: the extent to which understanding of a person's emotions, fears, and supportive actions is evident.
+            """
+        if step == 4:
+            criteria = """
+Logician: conversation structure (stages, questions to understand root causes, analysis).
+Tactician: focus on results and agreements (what will change, which steps to take).
+Inventor: creative approach to the communication format or solution (unusual ways of contact).
+Empath: mention of feelings, support, active listening, and respect for boundaries.
+            """
+        if step == 5:
+            criteria = """
+Logician: conversation structure (stages, questions to understand root causes, analysis).
+Tactician: focus on results and agreements (what will change, which steps to take).
+Inventor: creative approach to the communication format or solution (unusual ways of contact).
+Empath: mention of feelings, support, active listening, and respect for boundaries.
+            """
         def leader_fn():
             task = f"""
 You are a system for evaluating a player’s thinking style.
@@ -160,13 +189,48 @@ This result should be perfectly parsable by a JSON parser without errors.
                 return False
             leader_res = leader_score.calldata
             validator_res = leader_fn()
-            leader_score = leader_res["logician"]
-            validator_score = validator_res["logician"]
-            if validator_score == 0 or leader_score == 0:
-                return validator_score == leader_score
-            return abs(validator_score - leader_score) <= 2
+            leader_score_1 = leader_res["logician"]
+            validator_score_1 = validator_res["logician"]
+            leader_score_2 = leader_res["tactician"]
+            validator_score_2 = validator_res["tactician"]
+            leader_score_3 = leader_res["inventor"]
+            validator_score_3 = validator_res["inventor"]
+            leader_score_4 = leader_res["empath"]
+            validator_score_4 = validator_res["empath"]
+            diff_1 = abs(validator_score_1 - leader_score_1)
+            diff_2 = abs(validator_score_2 - leader_score_2)
+            diff_3 = abs(validator_score_3 - leader_score_3)
+            diff_4 = abs(validator_score_4 - leader_score_4)
+            sequence_diffs = [diff_1, diff_2, diff_3, diff_4]
+            max_diff = max(sequence_diffs)
+            return max_diff <= 3
 
-        result_ai = gl.vm.run_nondet(leader_fn, validator_fn)          
+        result_ai = gl.vm.run_nondet(leader_fn, validator_fn) 
+        activation.current = step
+        activation.score[step] = json.dumps({
+            "logician": result_ai["logician"],
+            "tactician": result_ai["tactician"],
+            "inventor": result_ai["inventor"],
+            "empath": result_ai["empath"]
+        })
+        if step == 5:
+            token_id = self.ids[sender_address]
+            trait = self.traits[token_id]
+            skills = ["logician", "tactician", "inventor", "empath"]
+            skill_sums = {}
+            for skill in skills:
+                skill_sums[skill] = sum(
+                    json.loads(activation.score[i])[skill] 
+                    for i in range(1, 6)
+                )
+            sorted_skills = sorted(
+                skill_sums.items(), 
+                key=lambda item: item[1], 
+                reverse=True
+            )
+            trait.primary_skill = sorted_skills[0][0].capitalize()
+            trait.secondary_skill = sorted_skills[1][0].capitalize()
+            trait.activated = True
 
     @gl.public.write
     def create_activation(self, lang: str):

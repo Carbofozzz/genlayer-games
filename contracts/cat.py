@@ -43,6 +43,7 @@ class Contest:
     game_title: str
     game_active: bool
     game_players: TreeMap[Address, ScoreCat]
+    game_attempt: TreeMap[Address, u256]
 
     def __init__(self, game_id: str, game_creator: Address):
         self.game_id = game_id
@@ -56,7 +57,8 @@ class Contest:
                 "game_time": self.game_time,
                 "game_title": self.game_title,
                 "game_active": str(self.game_active),
-                "game_players": _parse_players(self.game_players)
+                "game_players": _parse_players(self.game_players),
+                "game_attempt": str(self.game_attempt.get(gl.message.sender_address, 0))
             }
 
 class CatBeauty(gl.Contract):
@@ -146,6 +148,9 @@ class CatBeauty(gl.Contract):
         game_cache = next((v for k, v in self.active_games.items() if v.game_id == game_id), None)
         if game_cache is None:
             raise Exception("Game not found")
+        attempt = game_cache.game_attempt.get(sender_address, 0)
+        if attempt == 3:
+            raise Exception("Attempts run out")
         desc_image_prompt = """
 Analyze the image and folow the rules described below.
 You are an AI assistant that analyzes an image and returns a JSON result.
@@ -501,6 +506,7 @@ This result should be perfectly parsable by a JSON parser without errors.
                 score_nick=nick
             )
             game_cache.game_players[sender_address]=s
+            game_cache.game_attempt[sender_address]= attempt + 1
             if sender_address != game_cache.game_creator:
                 StatIface(self.stat).emit().add_user_points_game_to_archive(sender_address.as_hex, game_id, game_cache.game_time, 5, 0)
             self.error = str(result_ai["cat_beauty_score"])

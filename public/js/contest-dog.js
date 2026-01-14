@@ -213,7 +213,12 @@ import {
           p.style.marginTop = '1rem';
           leaderboard.appendChild(p);
 
-          if (statusContainer && game.game_active === 'True') {
+          let hasAttempts = true;
+          if (game.game_attempt && game.game_attempt === '3') {
+            hasAttempts = false;
+          }
+
+          if (statusContainer && game.game_active === 'True' && hasAttempts) {
             const joinBtn = document.createElement('button');
             joinBtn.type = 'button';
             joinBtn.className = 'btn';
