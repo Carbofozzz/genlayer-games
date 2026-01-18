@@ -134,8 +134,7 @@ import {
               if (burnBtn) burnBtn.classList.add('hidden');
               getActivation(false);
             } else {
-              if (burnBtn) burnBtn.classList.remove('hidden');
-              if (burnBtn) burnBtn.classList.remove('hidden');
+              if (burnBtn) burnBtn.classList.add('hidden');
               if (activationContainer) activationContainer.classList.add('hidden');
             }
             renderMochi(res);
@@ -156,6 +155,8 @@ import {
         const activateBtn = document.getElementById('activateBtn');
         const select = document.getElementById('languageSelect');
         const question = document.getElementById('question');
+        const area = document.getElementById('answer');
+        const note = document.getElementById('noteMochi');
         if (activationContainer) activationContainer.classList.add('hidden');
         try {
           const game = await client.readContract({
@@ -168,18 +169,22 @@ import {
             if (activationContainer) activationContainer.classList.add('hidden');
             if (activateBtn) activateBtn.classList.remove('hidden');
             if (select) select.classList.remove('hidden');
+            if (note) note.textContent = "Mochi NFT is your gateway to the world of Mochi Games. Mint and start leveling up your NFT by solving challenges and completing AI-powered quests. Who will be the first to reach level 999?";
           } else if (res.status == "completed") {
             if (activationContainer) activationContainer.classList.add('hidden');
             if (activateBtn) activateBtn.classList.add('hidden');
             if (select) select.classList.add('hidden');
+            if (note) note.textContent = "Mochi NFT is your gateway to the world of Mochi Games. Mint and start leveling up your NFT by solving challenges and completing AI-powered quests. Who will be the first to reach level 999?";
             if (answered) {
               getMyMochi();
             }
           } else {
+            if (note) note.textContent = "Answer the question to define your Mochi's primary and secondary skills";
             if (activationContainer) activationContainer.classList.remove('hidden');
             if (activateBtn) activateBtn.classList.add('hidden');
             if (select) select.classList.add('hidden');
             if (question) question.textContent = res.question;
+            if (area) area.value='';
           }
           stopMochiPulse();
           console.error('Success getting my activation:', res);

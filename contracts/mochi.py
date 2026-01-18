@@ -213,9 +213,10 @@ This result should be perfectly parsable by a JSON parser without errors.
             "inventor": result_ai["inventor"],
             "empath": result_ai["empath"]
         })
+        token_id = self.ids[sender_address]
+        trait = self.traits[token_id]
+        trait.level = step
         if step == 5:
-            token_id = self.ids[sender_address]
-            trait = self.traits[token_id]
             skills = ["logician", "tactician", "inventor", "empath"]
             skill_sums = {}
             for skill in skills:

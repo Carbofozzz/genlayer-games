@@ -36,6 +36,7 @@
         display: flex;
         align-items: flex-start;
         gap: 1.5rem;
+        min-width: 300px;
         padding: 0.75rem 1rem;
         border: 1px solid #ddd;
         border-radius: 8px;
@@ -48,6 +49,9 @@
         padding: 0.75rem 0;
       }
       .mochi-nft {
+        width:50%;
+        max-width: 300px;
+        max-height: 300px;
         min-width: 300px;
         min-height: 300px;
         border: 1px solid #ddd;
@@ -56,10 +60,20 @@
         justify-content: center;
         align-items: center;
       }
+      @media (max-width: 700px) {
+        .mochi-layout {
+          flex-direction: column;flex-wrap: wrap;
+        }
+        .mochi-info {
+          min-width: 0;           
+          width: 100%;       
+          padding: 0 0.75rem;      
+        }
+      }
 
-.mochi-info > div + div {
-  margin-top: 0.35rem;
-}
+      .mochi-info > div + div {
+        margin-top: 0.35rem;
+      }
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
@@ -81,7 +95,7 @@
       <h1>Your Mochi NFT</h1>
       <div class="mochi-layout">
         <div class="mochi-nft">
-          <div id="mochiContainer" class="hidden" style="width:300px;display: flex; justify-content: center; align-items: center;"></div>
+          <div id="mochiContainer" class="hidden" style="width:100%;display: flex; justify-content: center; align-items: center;"></div>
           <button id="mintBtn" class="btn hidden">Mint</button>
           <div id="mochiProgress" class="spinner hidden" aria-label="Loading"></div>
         </div>

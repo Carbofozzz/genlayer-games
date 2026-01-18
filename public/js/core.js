@@ -11,12 +11,10 @@ let contractGuess = '0xe17e1193496C353a4741D26a86d428201FA2B45b';
 let contractMatch = '0xfe3D363FCd13c79541B802F09e92Ef5B67F169D6';
 let contractQuiz = '0xA23B1b240903d7a9b85b7878139f936DDA6Bd820';
 let contractPunch = '0x51eD95A3c625A8eAE5e7ED87Cc586ec54220c718';
-//let contractBeauty = '0x41c4EbE0eFDe4b526c6301cC365ff7625D7be84E';
-let contractBeauty = '0xDe1CA81a666361CBa32d06830327D06ed2c455d6';
-//let contractDogBeauty = '0x8017a5a51061B1e68B9c7c6e0b912722AFFbeE17';
-let contractDogBeauty = '0x5165b3b0ddc543BE7808a12a35A9f87ca849f8A1';
+let contractBeauty = '0x41c4EbE0eFDe4b526c6301cC365ff7625D7be84E';
+let contractDogBeauty = '0x8017a5a51061B1e68B9c7c6e0b912722AFFbeE17';
 let contractCook = '0x79fCa43f7B31Cf2C4406c8d736861a0651d60322';
-let contractMochi = '0xdD7e61ac3F40fd64A122D41a40ce262616146604';
+let contractMochi = '0x97DB7B5a79f75BF81479d029317325F936865D09';
 
 const FLAG_KEY = 'answeredFlags';
 
