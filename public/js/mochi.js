@@ -111,10 +111,13 @@ import {
         const burnBtn = document.getElementById('burnBtn');
         const progress = document.getElementById('mochiProgress');
         const activationContainer = document.getElementById('activationContainer');
+        const container = document.getElementById('mochiContainer');
         if (mintBtn) mintBtn.classList.add('hidden');
         if (burnBtn) burnBtn.classList.add('hidden');
         if (activationContainer) activationContainer.classList.add('hidden');
-        if (progress) progress.classList.remove('hidden');
+        if (container && container.innerHTML.trim() === '') {
+          if (progress) progress.classList.remove('hidden');
+        }
         try {
           const game = await client.readContract({
             address: contractMochi,
