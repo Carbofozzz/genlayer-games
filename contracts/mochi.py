@@ -4,6 +4,14 @@ from genlayer import *
 from dataclasses import dataclass
 import json
 
+@gl.contract_interface
+class StatIface:
+    class View:
+        def get_nicknames(self) -> dict: ...
+ 
+    class Write:
+        pass
+
 @allow_storage
 @dataclass
 class Activation:
@@ -49,6 +57,7 @@ class Trait:
 
 class MochiNFT(gl.Contract):
     owner: Address
+    stat: Address
     admins: DynArray[Address]
     error: str
     token_counter: u256
@@ -57,11 +66,12 @@ class MochiNFT(gl.Contract):
     activations: TreeMap[Address, Activation]
     consumed_tasks: TreeMap[Address, DynArray[u256]]
 
-    def __init__(self):
+    def __init__(self, stat_contract: str):
         self.error = "None"
         self.token_counter = 0
         self.owner = gl.message.sender_address
         self.admins.append(gl.message.sender_address)
+        self.stat = Address(stat_contract)
 
     @gl.public.write
     def add_admin(self, admin_contract: str):
@@ -96,7 +106,7 @@ class MochiNFT(gl.Contract):
         self.activations[sender_address] = Activation()
 
     @gl.public.write
-    def up(self, token_id: int, task: int, points: int):
+    def up_consume(self, token_id: int, task: int, points: int):
         self._only_admins()
         nft = self.traits.get(token_id, None)
         if nft is None:
@@ -109,7 +119,18 @@ class MochiNFT(gl.Contract):
         already_consumed.append(task)
         self.consumed_tasks[gl.message.sender_address] = already_consumed
         old_level = nft.level
-        nft.level = old_level + points
+        nft.level = max(5, old_level + points)
+
+    @gl.public.write
+    def up(self, token_id: int, points: int):
+        self._only_admins()
+        nft = self.traits.get(token_id, None)
+        if nft is None:
+            raise Exception("There is no such Mochi yet")
+        if not nft.activated:
+            raise Exception("This Mochi has not been activated yet")
+        old_level = nft.level
+        nft.level = max(5, old_level + points)
 
     @gl.public.write
     def answer_activation(self, answer: str):
@@ -420,12 +441,13 @@ This result should be perfectly parsable by a JSON parser without errors.
     @gl.public.view
     def get_rating(self, limit: int) -> str:
         result = []
+        nicknames = StatIface(self.stat).view().get_nicknames()
         for i, t in sorted(self.traits.items(), key=lambda it: float(it[1].level), reverse=True)[:limit]:
             address = ""
             for a, n in self.ids.items():
                 if n == i:
                     address = a.as_hex
-            result.append({ "id": i, "level": t.level, "owner": address })
+            result.append({ "id": i, "level": t.level, "owner": address, "nick": nicknames.get(address, "") })
         return json.dumps(result)
 
     @gl.public.view
