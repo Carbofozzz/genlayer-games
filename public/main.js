@@ -11,6 +11,7 @@ import {
     checkPage,
   } from './js/core.js';
   
+  import { answerMochiQuest, startMochiQuest } from './js/game-quest.js';
   import { gameGuess, answer } from './js/game-guess.js';
   import { gameMatch, answerMatch } from './js/game-match.js';
   import { gamePunch, joke } from './js/game-punch.js';
@@ -55,7 +56,9 @@ import {
     mintMochi,
     burnMochi,
     activateMochi,
-    answerMochi
+    answerMochi,
+    answerMochiQuest,
+    startMochiQuest
   };
   
   if (typeof window !== 'undefined') {

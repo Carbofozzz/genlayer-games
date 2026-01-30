@@ -4,6 +4,44 @@ import { getGameMatch } from './game-match.js';
 import { getGamePunch } from './game-punch.js';
 import { getGameCook } from './game-cook.js';
 
+function renderQuestIntro(error) {
+  const introBlock = document.getElementById('intro');
+  const gameBlock = document.getElementById('game');
+  const select = document.getElementById('languageSelect');
+  const startBtn = document.getElementById('startBtn');
+  const mochiBtn = document.getElementById('mochiBtn');
+  if (introBlock) introBlock.classList.remove('hidden');
+  if (gameBlock) gameBlock.classList.add('hidden');
+  if (error === "This address has not minted Mochi yet" || error === "Your Mochi hasn't been activated yet") {
+    if (select) select.classList.add('hidden');
+    if (startBtn) startBtn.classList.add('hidden');
+    if (mochiBtn) mochiBtn.classList.remove('hidden');
+  } else {
+    if (select) select.classList.remove('hidden');
+    if (startBtn) startBtn.classList.remove('hidden');
+    if (mochiBtn) mochiBtn.classList.add('hidden');
+  }
+}
+
+function renderQuest(quest) {
+  const introBlock = document.getElementById('intro');
+  const gameBlock = document.getElementById('game');
+  const clearBtn = document.getElementById('clearBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const progress = document.getElementById('saveProgress');
+  const narration = document.getElementById('narration');
+  const task = document.getElementById('task');
+  const comment = document.getElementById('comment');
+  if (introBlock) introBlock.classList.add('hidden');
+  if (progress) progress.classList.add('hidden');
+  if (gameBlock) gameBlock.classList.remove('hidden');
+  if (clearBtn) clearBtn.classList.remove('hidden');
+  if (saveBtn) saveBtn.classList.remove('hidden');
+  if (narration) narration.textContent = quest.last_narration
+  if (task) task.textContent = quest.last_task_summary
+  if (comment) comment.textContent = quest.last_comment
+}
+
 function renderGame(state, game) {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const dataContainer = document.getElementById('gameContainer');
@@ -424,4 +462,6 @@ export {
   renderGamePunch,
   renderGameCook,
   showPlayers,
+  renderQuestIntro,
+  renderQuest
 };

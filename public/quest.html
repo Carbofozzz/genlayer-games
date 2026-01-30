@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_black-BvQhofdN.svg" media="(prefers-color-scheme: light)"/>
     <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_white-DC3VjLtV.svg" media="(prefers-color-scheme: dark)"/>
-    <title>AiQuiz - a game powered by the GenLayer intelligent contract</title>
+    <title>Mochi: Saving the Consensus - the ultimate quest</title>
     <style>
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
       .wrap { max-width: 800px; margin: 0 auto; }
@@ -14,58 +14,21 @@
       .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
       .nav a { color: #0366d6; text-decoration: none; }
       .nav a.active { font-weight: 600; }
-      .quiz a { color: #0366d6; text-decoration: none; }
+      .punch a { color: #0366d6; text-decoration: none; }
       .nav .links { display: flex; gap: .75rem; }
       .nav .wallet { display: flex; gap: .5rem; align-items: center; }
       .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
-      .hidden { display: none !important; }
-      .theme {
-        display: grid;
-        grid-auto-rows: auto;
-        row-gap: .75rem;
-        margin-top: 1rem;
-      }
-      .in_row {
-        display: grid;
-        grid-template-columns: 1fr 260px;
-        column-gap: .75rem;
-        align-items: end;
-        margin-top: .5rem;
-      }
-      .in_column,
-      .in_column_end {
-        min-width: 0;
-      }
-      .in_column label,
-      .in_column_end label {
-        display: block;
-        font-size: 12px;
-        color: #808080;
-        margin-bottom: .5rem;
-      }
-      .theme input,
-      .theme select {
-        width: 100%;
-        padding: .6rem .7rem;
-        font: inherit;
-        font-size: 14px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        box-sizing: border-box;
-      }
+      .theme { margin-top: 1rem; }
+      .intro select { padding: .35rem .7rem; font-family: inherit; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; margin-left: .5rem; }
+      .theme textarea { width: 100%; height: 200px; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
       .theme .row {
         display: flex;
         gap: .5rem;
         justify-content: flex-start;
-        padding-top: .25rem;
+        padding-top: .5rem;
       }
-      @media (max-width: 640px) {
-        .in_row {
-      grid-template-columns: 1fr;
-      row-gap: .5rem;
-        }
-      }
-      .theme .spinner {
+      .hidden { display: none !important; }
+      .spinner {
         width: 20px;
         height: 20px;
         border: 2px solid #ddd;
@@ -73,12 +36,28 @@
         border-radius: 50%;
         animation: spin .8s linear infinite;
       }
+      .game-top {
+        border-radius: 8px;   
+        overflow: hidden;     
+        display: block;       
+        max-width: 100%;
+        height: auto;
+      }
+      #gameProgress {
+        position: fixed;
+        inset: 0;               
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.7); 
+        z-index: 1000;        
+      }
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
     </style>
   </head>
-  <body data-page-name="start_quiz">
+  <body data-page-name="mochi_quest">
     <div class="nav">
       <div class="links">
         <a href="/">New Game</a>
@@ -92,67 +71,71 @@
       </div>
     </div>
     <div class="wrap">
-      <h1>Create a AiQuiz game</h1>
-      <div class="theme">
-        <div class="in_row">
-          <div class="in_column">
-            <label for="game_title">Set a quiz title:</label>
-            <input type="text" id="game_title" placeholder="Type quiz title..." maxlength="20"/>
-          </div>
-          <div class="in_column_end">
-            <label for="languageSelect">Select a language:</label>
-            <select id="languageSelect" aria-label="Quiz language"></select>
-          </div>
-        </div>
-        <div class="in_row">
-          <div class="in_column">
-            <label for="src">Set a source article url:</label>
-            <input type="text" id="src" placeholder="Type article url..."/>
-          </div>
-          <div class="in_column_end">
-            <label for="qty">Set question quantity:</label>
-            <input type="number" id="qty" placeholder="Question quantity" max="20" min="1" value="2"/>
-          </div>
-        </div> 
+      <h1>Mochi: Saving the Consensus</h1>
+      <img src="/img/quest2.png" class="game-top"/>
+      <div id="gameProgress" class="hidden">
+        <div id="gameProgressSpinner" class="spinner" aria-label="Loading"></div>
+      </div>
+      <div id="intro" class="intro hidden">  
+        <p style="font-style: italic;">Near future, where most states and classic institutions of power have dissolved into network structures. The world looks almost like ours: same cities, corporations, digital services and social networks. But key decisions are no longer made by people in offices — they are made by AI-agents and distributed networks running on “intelligent contracts”, where decisions in the blockchain are taken by consensus of AI validators. </p>
+        <p style="font-style: italic;">At the center is a unified synthetic jurisdiction, an AI complex composed of multiple LLMs making decisions by consensus, linked to major blockchain protocols and formally independent from any human authority. However, more and more anomalous rulings are being recorded, contradicting logic or the interests of most users, and in the depths of the networks traces of an unknown “over-protocol” are found, absent from public specs. The main intrigue is to discover who or what is rewriting the rules of the global jurisdiction: evolution of the AI itself, collusion of AI validators, a carefully hidden human conspiracy, or a long-standing bug in the optimistic democracy consensus code. </p>
+        <p style="font-style: italic;">And somewhere in the darkness of an abandoned GenLayer warehouse, Mochi the cybercat activates to fix the problem...</p>
         <div class="row">
-          <button id="openBtn" class="btn">Open-ended questions</button>
-          <button id="closeBtn" class="btn">Closed questions</button>
-          <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
+          <button id="mochiBtn" class="btn hidden">Get Mochi NFT</button>
+          <button id="startBtn" class="btn">Start Quest</button>
+          <select id="languageSelect" aria-label="Quest language"></select>
+          <div id="startProgress" class="spinner hidden" aria-label="Loading"></div>
         </div>
-        <p id="game_link_p" class="quiz hidden"><a id="game_link" href="">The Quiz page</a></p>
-        <div id="answers">
+      </div>
+
+      <div id="game" class="theme hidden" style="margin-top:1rem; gap:.5rem;">
+        <p id="narration" style="font-style: italic;"></p>
+        <h3 id="task"></h3>
+        <textarea id="theme" placeholder="Type your answer..."></textarea>
+        <div class="row">
+            <button id="clearBtn" class="btn">Clear</button>
+            <button id="saveBtn" class="btn">Answer</button>
+            <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
         </div>
+        <p id="comment" style="font-size: 13px; color:#6b7280; margin-top:2em"></p>
       </div>
     </div>
     <script type="module" src="/main.js"></script>
     <script>
-      const title = document.getElementById('game_title');
-      const qty = document.getElementById('qty');
-      const article = document.getElementById('src');
       const select = document.getElementById('languageSelect');
-      const submitOpenBtn = document.getElementById('openBtn');
-      const submitCloseBtn = document.getElementById('closeBtn');
-      if (submitOpenBtn) submitOpenBtn.addEventListener('click', async () => {
+      const area = document.getElementById('theme');
+      const clearBtn = document.getElementById('clearBtn');
+      const startBtn = document.getElementById('startBtn');
+      const submitBtn = document.getElementById('saveBtn');
+      const mochiBtn = document.getElementById('mochiBtn');
+      if (mochiBtn) mochiBtn.addEventListener('click', () => { 
+        window.location.href = `/mochi`;
+      });
+      if (clearBtn) clearBtn.addEventListener('click', () => { if (area) area.value=''; });
+      if (submitBtn) submitBtn.addEventListener('click', async () => {
         try {
-          if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
-          const gameUrl = (article && article.value || '').trim();
-          const gameTitle = (title && title.value || '').trim();
-          const gameQty = (qty && qty.value || '').trim();
-          const gameLang = languages.find(l => l.code === select.value)?.name || select.value;
-          if (!gameUrl) { alert('Please enter an url'); return; }
-          WalletUI.gameQuiz(gameTitle, gameLang, gameQty, gameUrl, false);
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          if (!WalletUI.nickIsSet()) throw new Error('Please provide your Discord nickname first.');
+        } catch (e) { 
+          alert(e.message); 
+          window.location.href = `/me`;
+          return; 
+        }
+        try {
+          const value = (area && area.value || '').trim();
+          if (!value) { alert('Please enter an answer'); return; }
+          WalletUI.answerMochiQuest(value);
         } catch(e) { alert(e.message); }
       });
-      if (submitCloseBtn) submitCloseBtn.addEventListener('click', async () => {
+      if (startBtn) startBtn.addEventListener('click', async () => {
         try {
-          if (!window.WalletUI || !WalletUI.isConnected()) throw new Error('Please connect your wallet first');
-          const gameUrl = (article && article.value || '').trim();
-          const gameTitle = (title && title.value || '').trim();
-          const gameQty = (qty && qty.value || '').trim();
-          const gameLang = languages.find(l => l.code === select.value)?.name || select.value;
-          console.log("lang " + gameLang);
-          if (!gameUrl) { alert('Please enter an url'); return; }
-          WalletUI.gameQuiz(gameTitle, gameLang, gameQty, gameUrl, true);
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          const gameLang = getSelectedLangName();
+          WalletUI.startMochiQuest(gameLang);
         } catch(e) { alert(e.message); }
       });
       const languages = [
@@ -209,7 +192,7 @@
         { code: "tk", name: "Turkmen" }
       ];
 
-      const LANG_STORAGE_KEY = 'quiz_lang';
+      const LANG_STORAGE_KEY = 'quest_lang';
 
       function populateLanguages(list) {
         select.innerHTML = '';
@@ -259,7 +242,7 @@
       }
 
       function getSelectedLangName() {
-        return languages.find(l => l.code === select.value)?.name || '';
+        return languages.find(l => l.code === select.value)?.name || select.value;
       }
 
       initLanguageSelector();

@@ -489,6 +489,10 @@ app.get('/mochi', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/mochi.html'));
 });
 
+app.get('/mochi-quest', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/quest.html'));
+});
+
 app.get('/quiz/:id', async (req, res) => {
   try {
     res.set('Content-Type', 'text/html; charset=utf-8');
@@ -655,6 +659,8 @@ function getDogPage(req) {
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_black-BvQhofdN.svg" media="(prefers-color-scheme: light)"/>
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_white-DC3VjLtV.svg" media="(prefers-color-scheme: dark)"/>
       <title>Dog Beauty Contest</title>
       <style>
         #loadingIndicator {
@@ -744,6 +750,8 @@ function getPunchPage(req) {
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_black-BvQhofdN.svg" media="(prefers-color-scheme: light)"/>
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_white-DC3VjLtV.svg" media="(prefers-color-scheme: dark)"/>
       <title>PunchLine Id: ${req.params.id}</title>
       <style>
         #loadingIndicator {
@@ -883,6 +891,8 @@ function getCookPage(req) {
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_black-BvQhofdN.svg" media="(prefers-color-scheme: light)"/>
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_white-DC3VjLtV.svg" media="(prefers-color-scheme: dark)"/>
       <title>CookItUp Id: ${req.params.id}</title>
       <style>
         #loadingIndicator {
@@ -1022,6 +1032,8 @@ function getQuizPage(req) {
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_black-BvQhofdN.svg" media="(prefers-color-scheme: light)"/>
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_white-DC3VjLtV.svg" media="(prefers-color-scheme: dark)"/>
       <title>AiQuiz Id: ${req.params.id}</title>
       <style>
         #loadingIndicator {
@@ -1126,6 +1138,8 @@ function getGuessPage(req, type, mode) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_black-BvQhofdN.svg" media="(prefers-color-scheme: light)"/>
+      <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_white-DC3VjLtV.svg" media="(prefers-color-scheme: dark)"/>
     <title>${type} Id: ${req.params.id}</title>
     <style>
       #loadingIndicator {
