@@ -32,6 +32,7 @@ function renderQuest(quest) {
   const narration = document.getElementById('narration');
   const task = document.getElementById('task');
   const comment = document.getElementById('comment');
+  const area = document.getElementById('theme');
   if (introBlock) introBlock.classList.add('hidden');
   if (progress) progress.classList.add('hidden');
   if (gameBlock) gameBlock.classList.remove('hidden');
@@ -40,6 +41,7 @@ function renderQuest(quest) {
   if (narration) narration.textContent = quest.last_narration
   if (task) task.textContent = quest.last_task_summary
   if (comment) comment.textContent = quest.last_comment
+  if (area) area.value=''; 
 }
 
 function renderGame(state, game) {
