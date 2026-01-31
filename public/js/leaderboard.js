@@ -2,6 +2,7 @@ import {
     client,
     TransactionStatus,
     contractStat,
+    contractMochi,
     getStat,
     maskAddress
   } from './core.js';
@@ -17,7 +18,7 @@ import {
       tab.addEventListener('click', () => {
         const name = tab.dataset.tab;
         tabs.forEach(t => t.classList.toggle('lb-tab-active', t === tab));
-        ['overall', 'guess', 'match', 'quiz', 'punch', 'cook'].forEach(key => {
+        ['overall', 'guess', 'match', 'quiz', 'punch', 'cook', 'mochi'].forEach(key => {
           const el = document.getElementById('leaderboard-' + key);
           if (el) el.style.display = key === name ? '' : 'none';
         });
@@ -32,6 +33,8 @@ import {
           getLeaderboardPunch();
         } else if (name === 'cook') {
           getLeaderboardCook();
+        } else if (name === 'mochi') {
+          getLeaderboardMochi();
         }
       });
     });
@@ -166,6 +169,27 @@ import {
     }
   }
 
+  async function getLeaderboardMochi() {
+    if (!client) return;
+    try {
+      const rating = await client.readContract({
+        address: contractMochi,
+        functionName: 'get_rating',
+        args: [50],
+      });
+      let res = JSON.parse(rating);
+      console.error('Success getting leaderboard nft: ', res);
+      const sorted = [...res].sort((a, b) => {
+        const pointsA = Number(a.level) || 0;
+        const pointsB = Number(b.level) || 0;
+        return pointsB - pointsA;
+      });
+      renderLeaderboard('leaderboard-mochi', sorted);
+    } catch (error) {
+      console.error('Error getting leaderboard nft:', error);
+    }
+  }
+
   async function getLeaderboardMatch() {
     if (!client) return;
     try {
@@ -252,7 +276,11 @@ import {
   
       const left = document.createElement('div');
       const walletEl = document.createElement('div');
-      walletEl.textContent = maskAddress(item.wallet) ?? '';
+      if (rootId === "leaderboard-mochi") {
+        walletEl.textContent = maskAddress(item.owner) ?? '';
+      } else {
+        walletEl.textContent = maskAddress(item.wallet) ?? '';
+      }
       walletEl.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, monospace';
       walletEl.style.fontSize = '14px';
       left.appendChild(walletEl);
@@ -266,7 +294,11 @@ import {
       }
   
       const pointsEl = document.createElement('div');
-      pointsEl.textContent = String(item.points ?? 0);
+      if (rootId === "leaderboard-mochi") {
+        pointsEl.textContent = String(item.level ?? 0);
+      } else {
+        pointsEl.textContent = String(item.points ?? 0);
+      }
       pointsEl.style.textAlign = 'right';
       pointsEl.style.fontWeight = '600';
   
