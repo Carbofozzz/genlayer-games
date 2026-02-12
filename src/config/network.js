@@ -9,3 +9,15 @@ export const evmNetwork = {
   },
   blockExplorerUrls: (process.env.BLOCK_EXPLORER_URLS || 'https://etherscan.io').split(','),
 };
+
+export const baseSepoliaNetwork = {
+  chainIdHex: '0x14A34',
+  chainName: 'Base Sepolia',
+  rpcUrls: ('https://sepolia.base.org').split(','),
+  nativeCurrency: {
+    name: 'ETH',
+    symbol: 'ETH',
+    decimals: 18,
+  },
+  blockExplorerUrls: ('https://etherscan.io').split(','),
+};

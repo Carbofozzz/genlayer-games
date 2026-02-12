@@ -2,7 +2,7 @@ import {
     client,
     TransactionStatus,
     contractMochi,
-    maskAddress
+    checkGenlayer
   } from './core.js';
 
     async function mintMochi() {
@@ -14,6 +14,7 @@ import {
         if (burnBtn) burnBtn.classList.add('hidden');
         if (progress) progress.classList.remove('hidden');
         try {
+          await checkGenlayer();
             const txHash = await client.writeContract({
                 address: contractMochi,
                 functionName: "mint",
@@ -47,6 +48,7 @@ import {
       if (select) select.classList.add('hidden');
       startMochiPulse();
       try {
+        await checkGenlayer();
           const txHash = await client.writeContract({
               address: contractMochi,
               functionName: "create_activation",
@@ -77,6 +79,7 @@ import {
     if (submitBtn) submitBtn.classList.add('hidden');
     startMochiPulse();
     try {
+      await checkGenlayer();
       const txHash = await client.writeContract({
           address: contractMochi,
           functionName: "answer_activation",

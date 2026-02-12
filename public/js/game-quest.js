@@ -1,7 +1,8 @@
 import {
     client,
     TransactionStatus,
-    contractMochiQuest
+    contractMochiQuest,
+    checkGenlayer
   } from './core.js';
   import { 
     renderQuestIntro,  
@@ -47,6 +48,7 @@ import {
     if (saveBtn) saveBtn.classList.add('hidden');
     if (progress) progress.classList.remove('hidden');
     try {
+      await checkGenlayer();
       const txHash = await client.writeContract({
         address: contractMochiQuest,
         functionName: "answer",
@@ -81,6 +83,7 @@ import {
     if (languageSelect) languageSelect.classList.add('hidden');
     if (progress) progress.classList.remove('hidden');
     try {
+      await checkGenlayer();
       const txHash = await client.writeContract({
         address: contractMochiQuest,
         functionName: "start",

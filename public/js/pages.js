@@ -1,4 +1,5 @@
 import { getMochiQuest } from './game-quest.js';
+import { getQuestions, getQuestionStats, checkUsdcBalance, checkRewards } from './game-questions.js';
 import { getGame, getMyGuess } from './game-guess.js';
 import { getGameMatch, getMyMatch } from './game-match.js';
 import { getGamePunch, getMyPunch } from './game-punch.js';
@@ -66,6 +67,12 @@ function checkPageImpl() {
         break;
       case 'mochi_quest':
         getMochiQuest();
+        break;
+      case 'questions':
+        checkUsdcBalance();
+        checkRewards();
+        getQuestionStats();
+        getQuestions(true);
         break;
       default:
         console.log('Page has no data-page-name');

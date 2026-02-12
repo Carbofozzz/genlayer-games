@@ -23,6 +23,76 @@ function renderQuestIntro(error) {
   }
 }
 
+function renderQuestions(game) {
+  const gameBlock = document.getElementById('game');
+  const clearBtn = document.getElementById('clearBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const progress = document.getElementById('saveProgress');
+  const closed = document.getElementById('closed');
+  const answer = document.getElementById('answer');
+  const answerValue = document.getElementById('answerValue');
+  const history = document.getElementById('history');
+  const theme = document.getElementById('ui');
+  const area = document.getElementById('theme');
+  if (gameBlock) gameBlock.classList.remove('hidden');
+  if (history) {
+    history.innerHTML = '';
+    const list = document.createElement('ol');
+    list.style.listStyle = 'decimal';
+    list.style.paddingLeft = '1.25rem';
+    list.style.margin = '0';
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
+    list.style.gap = '.5rem';
+    const questions = Array.isArray(game.questions) ? game.questions : [];
+    questions
+      .slice()                                
+      .sort((a, b) => Number(a.order) - Number(b.order))
+      .forEach((q) => {
+        const li = document.createElement('li');
+        const qText = document.createElement('div');
+        qText.textContent = `Q: ${q.user_question}`;
+        const aText = document.createElement('div');
+        const ans = (q.master_answer || '').toString().toUpperCase();
+        aText.textContent = ans;
+        aText.style.fontSize = '14px';
+        aText.style.fontWeight = '700';
+        aText.style.marginTop = '2px';
+        aText.textContent = `A: ${ans}`;
+        li.appendChild(qText);
+        li.appendChild(aText);
+        list.appendChild(li);
+      });
+    history.appendChild(list);
+  }
+  if (game.active === 'True') {
+    if (answer && answerValue) {
+      answer.classList.add('answer-box--secret');
+      answer.classList.remove('answer-box--revealed');
+      answerValue.textContent = 'SECRET';
+    }
+    if (theme) theme.classList.remove('hidden');
+    if (clearBtn) clearBtn.classList.remove('hidden');
+    if (saveBtn) saveBtn.classList.remove('hidden');
+    if (progress) progress.classList.add('hidden');
+    if (closed) closed.classList.add('hidden');
+  } else {
+    if (answer && answerValue) {
+      answer.classList.remove('answer-box--secret');
+      answer.classList.add('answer-box--revealed');
+      answerValue.textContent = (game.answer || '').toUpperCase();
+    }
+    if (theme) theme.classList.add('hidden');
+    if (game.resolved == 'True') {
+      if (closed) closed.textContent = "You won! The game is over. Start a new one."
+    } else {
+      if (closed) closed.textContent = "You lose! The game is over. Start a new one."
+    }
+    if (closed) closed.classList.remove('hidden');
+  }
+  if (area) area.value=''; 
+}
+
 function renderQuest(quest) {
   const introBlock = document.getElementById('intro');
   const gameBlock = document.getElementById('game');
@@ -465,5 +535,6 @@ export {
   renderGameCook,
   showPlayers,
   renderQuestIntro,
-  renderQuest
+  renderQuest,
+  renderQuestions
 };

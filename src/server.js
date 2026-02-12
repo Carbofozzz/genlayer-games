@@ -5,7 +5,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import AWS from 'aws-sdk';
-import { evmNetwork } from './config/network.js';
+import { evmNetwork, baseSepoliaNetwork } from './config/network.js';
 import crypto from 'crypto';
 import sharp from 'sharp';
 import fetch from 'node-fetch';
@@ -64,6 +64,10 @@ app.get('/api/health', (_req, res) => {
 // Public endpoint to expose EVM network config
 app.get('/api/config/network', (_req, res) => {
   return res.json(evmNetwork);
+});
+
+app.get('/api/config/network_base_sepolia', (_req, res) => {
+  return res.json(baseSepoliaNetwork);
 });
 
 app.post('/api/signature', async (req, res) => {
@@ -491,6 +495,10 @@ app.get('/mochi', (_req, res) => {
 
 app.get('/mochi-quest', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/quest.html'));
+});
+
+app.get('/questions', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/questions.html'));
 });
 
 app.get('/quiz/:id', async (req, res) => {

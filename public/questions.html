@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_black-BvQhofdN.svg" media="(prefers-color-scheme: light)"/>
+    <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_white-DC3VjLtV.svg" media="(prefers-color-scheme: dark)"/>
+    <title>Twenty Questions  - a game powered by the GenLayer intelligent contract</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+      .wrap { max-width: 800px; margin: 0 auto; }
+      h1 { margin: 0 0 1rem; }
+      code { background: #f2f2f2; padding: .2rem .4rem; border-radius: 4px; }
+      .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .nav a { color: #0366d6; text-decoration: none; }
+      .nav a.active { font-weight: 600; }
+      .punch a { color: #0366d6; text-decoration: none; }
+      .nav .links { display: flex; gap: .75rem; }
+      .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+      .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+      .theme { margin-top: 1rem; }
+      .theme textarea { width: 100%; height: 100px; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
+      .theme .row {
+        display: flex;
+        gap: .5rem;
+        justify-content: flex-start;
+        padding-top: .5rem;
+      }
+      .hidden { display: none !important; }
+      .theme .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-top-color: #0366d6;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+      }
+      .gameProgress .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-top-color: #0366d6;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .game-header {
+        margin-top: 1rem;
+        margin-bottom: 1.5rem;
+        padding: 0.9rem 1rem;
+        border: 1px solid #e2e2e2;
+        border-radius: 10px;
+        display: flex;
+        align-items: stretch;
+        justify-content: space-between;
+        gap: 1rem;
+        background: #fafafa;
+      }
+      .game-header__section {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-width: 0;
+      }
+      .game-header__section--stat {
+        min-width: 40%;
+      }
+      .game-header__section--center {
+        align-items: center;
+        text-align: center;
+      }
+      .game-header__section--right {
+        align-items: flex-end;
+        text-align: right;
+      }
+      .game-header__title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.4rem;
+      }
+      .game-header__stats-row {
+        display: flex;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+      }
+      .game-header__stat {
+        text-align: center;
+      }
+      .game-header__stat-value {
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+      .game-header__stat-label {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .game-header__label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        opacity: 0.7;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.2rem;
+      }
+      .game-header__value {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 0.4rem;
+      }
+      .game-header__button {
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding-inline: 0.9rem;
+      }
+      .game-header__stats-row--compact {
+        margin-bottom: 0.4rem;
+      }
+      .game-header__footer-text {
+        font-size: 0.75rem;
+        opacity: 0.7;
+      }
+      .game-header__footer-spacer {
+        height: 30.8px;
+      }
+      .game-header__footer-spacer a { color: #0366d6; text-decoration: none; font-size: 0.8rem; }
+      .empty { opacity: 0.3; }
+      @media (max-width: 640px) {
+        .game-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .game-header__section {
+            align-items: center;
+            text-align: center;
+        }
+      }
+      .answer-box {
+        margin-top: .1rem;
+        padding: 0.9rem 1rem;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #f9fafb;
+        display: inline-flex;
+        flex-direction: column;
+        max-width: 100%;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+      }
+      .answer-box__label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #6b7280;
+        margin-bottom: 0.35rem;
+      }
+      .answer-box__value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #111827;
+        text-align: center;
+        word-break: break-word;
+      }
+      .answer-box--secret .answer-box__value {
+        color: #0366d6;
+      }
+      .answer-box--revealed {
+        border-color: #22c55e;
+        background: #f0fdf4;
+      }
+      .answer-box--revealed .answer-box__label {
+        color: #16a34a;
+      }
+      .answer-box--revealed .answer-box__value {
+        color: #14532d;
+      }
+    </style>
+  </head>
+  <body data-page-name="questions">
+    <div class="nav">
+      <div class="links">
+        <a href="/">New Game</a>
+        <a href="/mochi">Mochi NFT</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/rules">Rules</a>
+      </div>
+      <div class="wallet">
+        <a href="/me"><span id="addr" style="opacity:.8"></span></a>
+        <button id="connectBtn" class="btn">Connect wallet</button>
+      </div>
+    </div>
+    <div class="wrap">
+      <h1>Twenty Questions</h1>
+      <p>Pure mind, real money: guess the word in 10 to 10x your $1, or in 20 to get your money back.</p>
+
+      <div class="game-header">
+        <div class="game-header__section game-header__section--stat">
+            <div class="game-header__label">Game stats</div>
+            <div class="game-header__stats-row game-header__stats-row--compact">
+              <div class="game-header__stat">
+                <div class="game-header__stat-value" id="statAll">0</div>
+                <div class="game-header__stat-label">games</div>
+              </div>
+              <div class="game-header__stat">
+                <div class="game-header__stat-value" id="stat10x">0</div>
+                <div class="game-header__stat-label">10x wins</div>
+              </div>
+              <div class="game-header__stat">
+                <div class="game-header__stat-value" id="stat1x">0</div>
+                <div class="game-header__stat-label">1x wins</div>
+              </div>
+            </div>
+            <div class="game-header__footer-text">
+              Lifetime stats across all games
+            </div>
+          </div>
+      
+        <div class="game-header__section game-header__section--center">
+          <div class="game-header__label">Entry</div>
+          <div class="game-header__value" id="entryAmount">1 USDC</div>
+          <button class="btn game-header__button" id="startGameBtn" disabled>Start</button>
+        </div>
+      
+        <div class="game-header__section game-header__section--center">
+          <div class="game-header__label">Reward</div>
+          <div class="game-header__value empty" id="rewardAmount">0 USDC</div>
+          <button class="btn game-header__button" id="claimBtn" disabled>Claim</button>
+        </div>
+
+        <div class="game-header__section game-header__section--right">
+            <div class="game-header__label">Wallet</div>
+            <div class="game-header__value empty" id="balanceAmount">0 USDC</div>
+            <div class="game-header__footer-spacer">
+                <a target="_blank" href="https://faucet.circle.com/">Faucet</a>
+            </div>
+          </div>
+      </div>
+      <div id="gameProgress" class="gameProgress hidden">
+        <div id="gameProgressSpinner" class="spinner" aria-label="Loading"></div>
+      </div>
+      <div id="game" class="hidden">
+        <div id="answer" class="answer-box answer-box--secret">
+          <div class="answer-box__label">Secret word</div>
+          <div class="answer-box__value" id="answerValue">SECRET</div>
+        </div>
+        <div id="history" style="margin-top:1rem; gap:.5rem;"></div>
+        <div id="ui" class="theme" style="margin-top:1rem; gap:.5rem;">
+          <textarea id="theme" placeholder="Type your question or guess the word. Yes/No questions only..."></textarea>
+          <div class="row">
+              <button id="clearBtn" class="btn">Clear</button>
+              <button id="saveBtn" class="btn">Ask or Guess</button>
+              <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
+          </div>
+        </div>
+      </div>
+      <div id="closed" class="hidden" style="margin-top:1rem;">You won! The game is over. Start a new one.</div>
+    </div>
+    <script type="module" src="/main.js"></script>
+    <script>
+      const area = document.getElementById('theme');
+      const el = document.getElementById('game');
+      const clearBtn = document.getElementById('clearBtn');
+      const submitBtn = document.getElementById('saveBtn');
+      const startBtn = document.getElementById('startGameBtn');
+      const claimBtn = document.getElementById('claimBtn');
+      if (clearBtn) clearBtn.addEventListener('click', () => { if (area) area.value=''; });
+      if (submitBtn) submitBtn.addEventListener('click', async () => {
+        try {
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          if (!WalletUI.nickIsSet()) throw new Error('Please provide your Discord nickname first.');
+        } catch (e) { 
+          alert(e.message); 
+          window.location.href = `/me`;
+          return; 
+        }
+        try {
+          const value = (area && area.value || '').trim();
+          if (!value) { alert('Please enter your question'); return; }
+          WalletUI.askQuestion(el.dataset.tag, value);
+        } catch(e) { alert(e.message); }
+      });
+      if (startBtn) startBtn.addEventListener('click', async () => {
+        try {
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          if (!WalletUI.nickIsSet()) throw new Error('Please provide your Discord nickname first.');
+        } catch (e) { 
+          alert(e.message); 
+          window.location.href = `/me`;
+          return; 
+        }
+        try {
+          WalletUI.startQuestion();
+        } catch(e) { alert(e.message); }
+      });
+      if (claimBtn) claimBtn.addEventListener('click', async () => {
+        try {
+          if (!WalletUI.isConnected()) throw new Error('Please connect your wallet first');
+        } catch (e) { alert(e.message); return; }
+        try {
+          WalletUI.claimQuestion();
+        } catch(e) { alert(e.message); }
+      });
+    </script>
+  </body>
+</html>
