@@ -17,8 +17,8 @@ let contractDogBeauty = '0x8017a5a51061B1e68B9c7c6e0b912722AFFbeE17';
 let contractCook = '0x79fCa43f7B31Cf2C4406c8d736861a0651d60322';
 let contractMochi = '0x8C06eD92CcDc05a23Ec2cEb6196f310717872878';
 let contractMochiQuest = '0xe0E74E58deD82caA331B5cF0B46E62A663767d5A';
-let contractQuestions = '0xd7758989e414190E4c81CDC7cBB51B26D8A20082';
-let evmContractQuestions = '0x67e49832c9C1928fAf35a8233D50b8F00c7985Cb';
+let contractQuestions = '0xB30Ff003081124CEf7947D41785EAD3BdbEda543';
+let evmContractQuestions = '0xD695d6Cdd5Fb389469Bd1Ee240a82778FAC4Fd5A';
 
 const BASE_SEPOLIA_RPC = "https://sepolia.base.org";
 const BASE_SEPOLIA_USDC= "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -33,8 +33,11 @@ const erc20Abi = [
 const questionsAbi = [
   "function start() external payable returns (bytes32)",
   "function claim() external",
+  "function claimPart() external",
   "function claimableAmount(address user) external view returns (uint256)",
-  "function claimableUnits(address user) external view returns (uint256)"
+  "function claimableUnits(address user) external view returns (uint256)",
+  "event StringReceived(uint32 indexed sourceChainId, address indexed sourceContract, address indexed user, string action)",
+  "event BetPlaced(address indexed user, string randomId)"
 ];
 
 const FLAG_KEY = 'answeredFlags';

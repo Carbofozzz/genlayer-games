@@ -84,7 +84,7 @@ function renderQuestions(game) {
     }
     if (theme) theme.classList.add('hidden');
     if (game.resolved == 'True') {
-      if (closed) closed.textContent = "You won! The game is over. Start a new one."
+      if (closed) closed.textContent = "You won! The game is over. Start a new one. Your reward will be available in 2-3 minutes."
     } else {
       if (closed) closed.textContent = "You lose! The game is over. Start a new one."
     }

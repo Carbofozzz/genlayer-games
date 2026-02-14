@@ -128,6 +128,9 @@
       }
       .game-header__footer-spacer a { color: #0366d6; text-decoration: none; font-size: 0.8rem; }
       .empty { opacity: 0.3; }
+      .no-money {
+        color: red;
+      }
       @media (max-width: 640px) {
         .game-header {
             flex-direction: column;
@@ -258,6 +261,8 @@
         </div>
       </div>
       <div id="closed" class="hidden" style="margin-top:1rem;">You won! The game is over. Start a new one.</div>
+      <div id="creating" class="hidden" style="margin-top:1rem; color:#22c55e;">Creating a new game...</div>
+      <div id="rewarding" class="hidden" style="margin-top:1rem; color:#22c55e;">Checking your rewards. Please, don't start a new game...</div>
     </div>
     <script type="module" src="/main.js"></script>
     <script>

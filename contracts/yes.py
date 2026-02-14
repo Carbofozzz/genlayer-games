@@ -13,12 +13,14 @@ class Stat:
     total: u256
     passed: u256
     fast: u256
+    average_speed: str
 
     def to_dict(self):
         return {
             "total": str(self.total),
             "passed": str(self.passed),
-            "fast": str(self.fast)
+            "fast": str(self.fast),
+            "average": self.average_speed
         }
 
 @allow_storage
@@ -68,6 +70,7 @@ class TwentyQuestions(gl.Contract):
     target_contract: str
     owner: Address
     admins: DynArray[Address]
+    secrets: DynArray[str]
     games: TreeMap[Address, Game]
     stat: TreeMap[Address, Stat]
     global_stat: Stat
@@ -81,10 +84,18 @@ class TwentyQuestions(gl.Contract):
         self.target_contract = target_contract
         self.owner = gl.message.sender_address
         self.admins.append(gl.message.sender_address)
-        self.global_stat = Stat(total = 0, passed = 0, fast = 0)
+        self.global_stat = Stat(total = 0, passed = 0, fast = 0, average_speed = "0")
         self.error = "None"
-        self.fast_limit = 10
+        self.fast_limit = 9
         self.last_limit = 19
+
+    @gl.public.write
+    def add_words(self, words: str):
+        self._only_owner()
+        for word in words.split(','):
+            w = word.strip()
+            if w:          
+                self.secrets.append(w)
 
     @gl.public.write
     def add_admin(self, admin_contract: str):
@@ -122,19 +133,23 @@ class TwentyQuestions(gl.Contract):
         self.target_contract = target_contract
 
     @gl.public.write
-    def create_game(self, game_id: str, game_answer: str, creator: str):
+    def create_game(self, game_id: str, creator: str):
         self._only_owner()
+        if len(self.secrets) == 0:
+            raise Exception("There are no secrets")
+        answer = self.secrets[len(self.secrets) - 1]
+        self.secrets.pop()
         try:
             game = Game(
                 game_id = game_id,
-                game_answer = game_answer
+                game_answer = answer
             )
             creator = Address(creator)
             self.games[creator] = game
             self.global_stat.total = self.global_stat.total + 1
             user_stat = self.stat.get(creator, None)
             if user_stat is None:
-                user_stat = Stat(total = 0, passed = 0, fast = 0)
+                user_stat = Stat(total = 0, passed = 0, fast = 0, average_speed = "0")
             user_stat.total = user_stat.total + 1
             self.stat[creator] = user_stat
         except Exception as e:
@@ -145,17 +160,27 @@ class TwentyQuestions(gl.Contract):
         self._only_admins()
         string_message = gl.evm.decode(str, message)
         object_message = json.loads(string_message)
+        if len(self.secrets) == 0:
+            message = json.dumps({ "address": str(object_message["game_creator"]), "game": str(object_message["game_id"]), "action": "empty" })
+            abi = [str]
+            encoder = genvm_eth.MethodEncoder("", abi, bool)
+            message_bytes = encoder.encode_call([message])[4:]  # Remove method selector
+            bridge_contract = gl.get_contract_at(self.bridge_sender)
+            # bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
+            raise Exception("There are no secrets")
+        answer = self.secrets[len(self.secrets) - 1]
+        self.secrets.pop()
         try:
             game = Game(
                 game_id = str(object_message["game_id"]),
-                game_answer = str(object_message["game_answer"])
+                game_answer = answer
             )
             creator = Address(str(object_message["game_creator"]))
             self.games[creator] = game
             self.global_stat.total = self.global_stat.total + 1
             user_stat = self.stat.get(creator, None)
             if user_stat is None:
-                user_stat = Stat(total = 0, passed = 0, fast = 0)
+                user_stat = Stat(total = 0, passed = 0, fast = 0, average_speed = "0")
             user_stat.total = user_stat.total + 1
             self.stat[creator] = user_stat
         except Exception as e:
@@ -215,21 +240,27 @@ This result should be perfectly parsable by a JSON parser without errors.
         try:
             user_stat = self.stat.get(sender_address, None)
             if user_stat is None:
-                user_stat = Stat(total = 0, passed = 0, fast = 0)
+                user_stat = Stat(total = 0, passed = 0, fast = 0, average_speed = "0")
             qt = len(game_cache.game_questions)
             game_cache.game_questions[qt + 1] = Question(question_ask = question, question_answer = result_ai)
             if result_ai == "correct":
                 game_cache.game_resolved = True
                 game_cache.game_active = False
                 if qt <= self.fast_limit:
+                    self.global_stat.average_speed = str(((float(self.global_stat.average_speed) * (self.global_stat.fast + self.global_stat.passed)) + (qt + 1)) / (self.global_stat.fast + self.global_stat.passed + 1))
                     self.global_stat.fast = self.global_stat.fast + 1
+                    user_stat.average_speed = str(((float(user_stat.average_speed) * (user_stat.fast + user_stat.passed)) + (qt + 1)) / (user_stat.fast + user_stat.passed + 1))
                     user_stat.fast = user_stat.fast + 1
                 else:
+                    self.global_stat.average_speed = str(((float(self.global_stat.average_speed) * (self.global_stat.fast + self.global_stat.passed)) + (qt + 1)) / (self.global_stat.fast + self.global_stat.passed + 1))
                     self.global_stat.passed = self.global_stat.passed + 1
+                    user_stat.average_speed = str(((float(user_stat.average_speed) * (user_stat.fast + user_stat.passed)) + (qt + 1)) / (user_stat.fast + user_stat.passed + 1))
                     user_stat.passed = user_stat.passed + 1
                 self.stat[sender_address] = user_stat
                 # up mochi
-                message = json.dumps({ "address": sender_address.as_hex, "game": game_cache.game_id, "fast": qt <= self.fast_limit, "resolved": True })
+                message = json.dumps({ "address": sender_address.as_hex, "game": game_cache.game_id, "action": "1x" })
+                if qt <= self.fast_limit:
+                    message = json.dumps({ "address": sender_address.as_hex, "game": game_cache.game_id, "action": "10x" })
                 abi = [str]
                 encoder = genvm_eth.MethodEncoder("", abi, bool)
                 message_bytes = encoder.encode_call([message])[4:]  # Remove method selector
@@ -238,7 +269,7 @@ This result should be perfectly parsable by a JSON parser without errors.
             elif qt == self.last_limit:
                 game_cache.game_resolved = False
                 game_cache.game_active = False
-                message = json.dumps({ "address": sender_address.as_hex, "game": game_cache.game_id, "fast": False, "resolved": False })
+                message = json.dumps({ "address": sender_address.as_hex, "game": game_cache.game_id, "action": "fail" })
                 abi = [str]
                 encoder = genvm_eth.MethodEncoder("", abi, bool)
                 message_bytes = encoder.encode_call([message])[4:]  # Remove method selector

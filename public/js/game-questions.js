@@ -14,14 +14,29 @@ import {
     renderQuestions
 } from './ui-render.js';
 
+let waitGameTimer = null;
+let waitGameTimeout = null;
+let rewardGameTimer = null;
+let rewardGameTimeout = null;
+
 async function checkUsdcBalance() {
     const balance = document.getElementById('balanceAmount');
     const startBtn = document.getElementById('startGameBtn');
+    const gameBlock = document.getElementById('game');
     const bal = await getUSDCBalance();
     console.log("Balance", bal)
     if (balance) balance.innerText = bal.whole + ' ' + bal.symbol;
-    if (startBtn) startBtn.disabled = !bal.hasWhole;
-    if (bal.hasWhole) {
+
+    const hasBalance = bal.hasWhole;
+    const isWaiting = !!waitGameTimer || !!waitGameTimeout;
+    const hasActiveGame = gameBlock && gameBlock.dataset.state === 'True';
+    console.log("Disable modifiers hasBalance", hasBalance)
+    console.log("Disable modifiers isWaiting", isWaiting)
+    console.log("Disable modifiers hasActiveGame", hasActiveGame)
+    if (startBtn) {
+        startBtn.disabled = !(hasBalance && !isWaiting && !hasActiveGame);
+    }
+    if (hasBalance) {
       if (balance) balance.classList.remove('empty');
     } else {
       if (balance) balance.classList.add('empty');
@@ -42,17 +57,58 @@ async function checkRewards() {
         console.log("claimableUnits:", units.toString());
         if (rewards) rewards.innerText = units.toString() + ' USDC';
         const hasReward = units.gt(0);
-        if (claimBtn) claimBtn.disabled = !hasReward;
-        if (hasReward) {
-            if (rewards) rewards.classList.remove('empty');
-        } else {
+        if (!hasReward) {
+            if (claimBtn) claimBtn.disabled = true;
             if (rewards) rewards.classList.add('empty');
+            if (rewards) rewards.classList.remove('no-money');
+            return;
+        }
+
+        const usdc = await getUSDC();
+        const decimals = await usdc.decimals();
+
+        const oneUnit = ethers.BigNumber.from(10).pow(decimals);
+        const requiredAmount = units.mul(oneUnit);
+        const contractBalance = await usdc.balanceOf(evmContractQuestions);
+        console.log("USDC contract balance:", contractBalance.toString());
+        console.log("Required for claim:", requiredAmount.toString());
+
+        const enoughLiquidity = contractBalance.gte(requiredAmount);
+        const hasAtLeastOneUsdc = contractBalance.gte(oneUnit);
+        if (claimBtn) {
+            claimBtn.disabled = !(hasReward && hasAtLeastOneUsdc);
+            if (!hasReward) {
+                claimBtn.textContent = 'Claim';
+            } else if (enoughLiquidity) {
+                claimBtn.textContent = 'Claim';
+            } else if (hasAtLeastOneUsdc) {
+                const maxUnitsByBalance = contractBalance.div(oneUnit);
+                const availableUnits = units.lt(maxUnitsByBalance) ? units : maxUnitsByBalance;
+                if (rewards) {
+                    rewards.innerText = availableUnits.toString() + ' of ' + units.toString() + ' USDC';
+                }
+                claimBtn.textContent = 'Claim Part';
+            } else {
+                claimBtn.textContent = 'Claim';
+            }
+        }
+        if (hasReward && enoughLiquidity) {
+            if (rewards) {
+                rewards.classList.remove('empty');
+                rewards.classList.remove('no-money');
+            }
+        } else if (hasReward && !enoughLiquidity) {
+            if (rewards) {
+                rewards.classList.add('empty');
+                rewards.classList.add('no-money');
+            }
         }
     } catch (error) {
         console.error('Error in checkRewards:', error);
         if (rewards) {
             rewards.innerText = '0 USDC';
             rewards.classList.add('empty');
+            rewards.classList.remove('no-money');
         }
         if (claimBtn) claimBtn.disabled = true;
     }
@@ -60,6 +116,86 @@ async function checkRewards() {
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function startWaitRewardGame() {
+    if (rewardGameTimer) {
+      clearInterval(rewardGameTimer);
+      rewardGameTimer = null;
+    }
+    if (rewardGameTimeout) {
+      clearTimeout(rewardGameTimeout);
+      rewardGameTimeout = null;
+    }
+    console.log("start reward timer")
+
+    rewardGameTimer = setInterval(async () => {
+      try {
+        console.log('[rewardGameTimer] tick done');
+        await checkRewards();
+      } catch (e) {
+        console.error('checkRewards in wait error', e);
+      }
+    }, 30000);
+  
+    rewardGameTimeout = setTimeout(async () => {
+        console.log('[rewardGameTimer] timeout – stop timer');
+        clearInterval(rewardGameTimer);
+        rewardGameTimer = null;
+        rewardGameTimeout = null;
+  
+    }, 5 * 60 * 1000);
+}
+
+function startWaitActiveGame() {
+    const gameBlock = document.getElementById('game');
+    const startBtn = document.getElementById('startGameBtn');
+    const creating = document.getElementById('creating');
+    const rewarding = document.getElementById('rewarding');
+    if (startBtn) startBtn.disabled = true;
+    if (rewarding) creating.classList.add('hidden');
+    if (creating) creating.classList.remove('hidden');
+    if (waitGameTimer) {
+      clearInterval(waitGameTimer);
+      waitGameTimer = null;
+    }
+    if (waitGameTimeout) {
+      clearTimeout(waitGameTimeout);
+      waitGameTimeout = null;
+    }
+
+    waitGameTimer = setInterval(async () => {
+      try {
+        await getQuestions(false);
+        
+        const hasActiveGame = gameBlock && gameBlock.dataset.state === 'True';
+  
+        if (hasActiveGame) {
+          clearInterval(waitGameTimer);
+          waitGameTimer = null;
+          clearTimeout(waitGameTimeout);
+          waitGameTimeout = null;
+          checkUsdcBalance();
+          if (creating) creating.classList.add('hidden');
+        }
+      } catch (e) {
+        console.error('getQuestions in wait error', e);
+      }
+    }, 20000);
+  
+    waitGameTimeout = setTimeout(async () => {
+      clearInterval(waitGameTimer);
+      waitGameTimer = null;
+      waitGameTimeout = null;
+  
+      if (creating) creating.classList.add('hidden');
+      try {
+        await checkRewards();
+      } catch (e) {
+        console.error('checkRewards error', e);
+      }
+      checkUsdcBalance();
+    }, 4 * 60 * 1000);
 }
 
 async function startQuestion() {
@@ -82,17 +218,18 @@ async function startQuestion() {
             await approveTx.wait();
             console.log("Approve tx mined:", approveTx.hash);
         }
+        await sleep(1000);
         console.log("Calling start() on evmContractQuestions...");
         const tx = await gameContract.start();
         console.log("start() tx sent:", tx.hash);
         const receipt = await tx.wait();
         console.log("start() tx mined:", receipt.transactionHash);
+        startWaitActiveGame();
         await sleep(1000);
         checkUsdcBalance();
-        if (startBtn) startBtn.disabled = false;
     } catch (error) {
         console.error('Error in startQuestion:', error);
-        if (startBtn) startBtn.disabled = false;
+        checkUsdcBalance();
     }
 }
 
@@ -105,7 +242,7 @@ async function claimQuestion() {
         const signer = provider.getSigner();
         const gameContract = new ethers.Contract(evmContractQuestions, questionsAbi, signer);
         console.log("Calling claim() on evmContractQuestions...");
-        const tx = await gameContract.claim();
+        const tx = await gameContract.claimPart();
         console.log("claim() tx sent:", tx.hash);
         const receipt = await tx.wait();
         console.log("claim() tx mined:", receipt.transactionHash);
@@ -150,12 +287,16 @@ async function getQuestions(first) {
     const closed = document.getElementById('closed');
     const gameBlock = document.getElementById('game');
     const progress = document.getElementById('gameProgress');
-    if (closed) closed.classList.add('hidden');
+    const isWaiting = !!waitGameTimer || !!waitGameTimeout;
     if (first) {
+        if (closed) closed.classList.add('hidden');
         if (gameBlock) gameBlock.classList.add('hidden');
         if (progress) progress.classList.remove('hidden');
     } else {
-        if (gameBlock) gameBlock.classList.remove('hidden');
+        if (!isWaiting) {
+            if (closed) closed.classList.add('hidden');
+            if (gameBlock) gameBlock.classList.remove('hidden');
+        }
         if (progress) progress.classList.add('hidden');
     }
     try {
@@ -167,11 +308,20 @@ async function getQuestions(first) {
         let res = JSON.parse(game);
         if (progress) progress.classList.add('hidden');
         if (res.error) {
+            if (gameBlock) gameBlock.dataset.state = 'False';
             if (closed) closed.textContent = "You hasn't played yet. Start a new game."
             if (closed) closed.classList.remove('hidden');
             if (gameBlock) gameBlock.classList.add('hidden');
         } else {
-            if (gameBlock) gameBlock.dataset.tag = res.id;
+            if (gameBlock) {
+                const oldState = gameBlock.dataset.state;
+                gameBlock.dataset.tag = res.id;
+                gameBlock.dataset.state = res.active;
+                if (oldState === 'True' && res.active === 'False' && res.resolved == 'True') {
+                    startWaitRewardGame();
+                }
+                checkUsdcBalance();
+            }
             renderQuestions(res);
             if (res.active === 'False' && res.resolved == 'True') {
                 getQuestionStats();
