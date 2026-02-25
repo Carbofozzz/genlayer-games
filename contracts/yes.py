@@ -7,6 +7,14 @@ import json
 
 genvm_eth = gl.evm
 
+@gl.contract_interface
+class StatIface:
+    class View:
+        def get_nicknames(self) -> dict: ...
+ 
+    class Write:
+        pass
+
 @allow_storage
 @dataclass
 class Stat:
@@ -69,6 +77,7 @@ class TwentyQuestions(gl.Contract):
     target_chain_eid: u256
     target_contract: str
     owner: Address
+    users: Address
     admins: DynArray[Address]
     secrets: DynArray[str]
     games: TreeMap[Address, Game]
@@ -78,8 +87,9 @@ class TwentyQuestions(gl.Contract):
     last_limit: u256
     error: str
 
-    def __init__(self, bridge_sender: str, target_chain_eid: int, target_contract: str):
+    def __init__(self, bridge_sender: str, target_chain_eid: int, target_contract: str, stat_contract: str):
         self.bridge_sender = Address(bridge_sender)
+        self.users = Address(stat_contract)
         self.target_chain_eid = u256(target_chain_eid)
         self.target_contract = target_contract
         self.owner = gl.message.sender_address
@@ -157,20 +167,20 @@ class TwentyQuestions(gl.Contract):
 
     @gl.public.write
     def process_bridge_message(self, message_id: str, source_chain_id: int, source_sender: str, message: bytes):
-        self._only_admins()
-        string_message = gl.evm.decode(str, message)
-        object_message = json.loads(string_message)
-        if len(self.secrets) == 0:
-            message = json.dumps({ "address": str(object_message["game_creator"]), "game": str(object_message["game_id"]), "action": "empty" })
-            abi = [str]
-            encoder = genvm_eth.MethodEncoder("", abi, bool)
-            message_bytes = encoder.encode_call([message])[4:]  # Remove method selector
-            bridge_contract = gl.get_contract_at(self.bridge_sender)
-            # bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
-            raise Exception("There are no secrets")
-        answer = self.secrets[len(self.secrets) - 1]
-        self.secrets.pop()
         try:
+            self._only_admins()
+            string_message = gl.evm.decode(str, message)
+            object_message = json.loads(string_message)
+            if len(self.secrets) == 0:
+                message = json.dumps({ "address": str(object_message["game_creator"]), "game": str(object_message["game_id"]), "action": "empty" })
+                abi = [str]
+                encoder = genvm_eth.MethodEncoder("", abi, bool)
+                message_bytes = encoder.encode_call([message])[4:]  # Remove method selector
+                bridge_contract = gl.get_contract_at(self.bridge_sender)
+                bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
+                raise Exception("There are no secrets")
+            answer = self.secrets[len(self.secrets) - 1]
+            self.secrets.pop()
             game = Game(
                 game_id = str(object_message["game_id"]),
                 game_answer = answer
@@ -265,7 +275,7 @@ This result should be perfectly parsable by a JSON parser without errors.
                 encoder = genvm_eth.MethodEncoder("", abi, bool)
                 message_bytes = encoder.encode_call([message])[4:]  # Remove method selector
                 bridge_contract = gl.get_contract_at(self.bridge_sender)
-                # bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
+                bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
             elif qt == self.last_limit:
                 game_cache.game_resolved = False
                 game_cache.game_active = False
@@ -274,7 +284,7 @@ This result should be perfectly parsable by a JSON parser without errors.
                 encoder = genvm_eth.MethodEncoder("", abi, bool)
                 message_bytes = encoder.encode_call([message])[4:]  # Remove method selector
                 bridge_contract = gl.get_contract_at(self.bridge_sender)
-                # bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
+                bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
             else:
                 game_cache.game_resolved = False
                 game_cache.game_active = True
@@ -326,6 +336,14 @@ This result should be perfectly parsable by a JSON parser without errors.
         if stat is None:
             return json.dumps({ "error": "Stat not found" })
         return json.dumps(self.stat.to_dict())
+
+    @gl.public.view
+    def get_top_stat(self, limit: int) -> str:
+        result = []
+        nicknames = StatIface(self.users).view().get_nicknames()
+        for k, v in sorted(self.stat.items(), key=lambda kv: float(kv[1].fast), reverse=True)[:limit]:
+            result.append({ "wallet": k.as_hex, "nick": nicknames.get(k.as_hex, ""), "stat": v.to_dict() })
+        return json.dumps(result)
 
     @gl.public.view
     def get_config(self) -> dict:

@@ -4,6 +4,7 @@ import {
     contractGuess,
     markChanged,
     isChanged,
+    checkGenlayer,
     getStat,
     clearChanged
   } from './core.js';
@@ -97,6 +98,7 @@ async function getMyGuess() {
     if (submitBtn) submitBtn.classList.add('hidden');
     if (progress) progress.classList.remove('hidden');
     try {
+      await checkGenlayer();
       const txHash = await client.writeContract({
         address: contractGuess,
         functionName: "join_game",
@@ -133,6 +135,7 @@ async function getMyGuess() {
     if (submitBtn) submitBtn.classList.add('hidden');
     if (progress) progress.classList.remove('hidden');
     try {
+      await checkGenlayer();
       const txHash = await client.writeContract({
         address: contractGuess,
         functionName: "create_game",

@@ -18,6 +18,7 @@ import {
   import { gamePunch, joke } from './js/game-punch.js';
   import { gameCook, answerCook } from './js/game-cook.js';
   import { gameQuiz, answerQuiz, sendQuizAnswer } from './js/game-quiz.js';
+  import { sendDeveloperAnswer, answerDeveloper, gameDeveloper, getMyDeveloper } from './js/developer.js';
   import { catBeauty, getContest, getShareImage } from './js/contest.js';
   import { dogBeauty, getDogContest, getDogShareImage } from './js/contest-dog.js';
   import { setNickname } from './js/leaderboard.js';
@@ -62,7 +63,11 @@ import {
     startMochiQuest,
     askQuestion,
     startQuestion,
-    claimQuestion
+    claimQuestion,
+    sendDeveloperAnswer,
+    answerDeveloper,
+    gameDeveloper,
+    getMyDeveloper
   };
   
   if (typeof window !== 'undefined') {

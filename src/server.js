@@ -501,6 +501,10 @@ app.get('/questions', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/questions.html'));
 });
 
+app.get('/developer', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/developer.html'));
+});
+
 app.get('/quiz/:id', async (req, res) => {
   try {
     res.set('Content-Type', 'text/html; charset=utf-8');

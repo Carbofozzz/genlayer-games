@@ -3,6 +3,7 @@ import {
     TransactionStatus,
     contractStat,
     contractMochi,
+    checkGenlayer,
     getStat,
     maskAddress
   } from './core.js';
@@ -318,6 +319,7 @@ import {
     if (submitBtn) submitBtn.classList.add('hidden');
     if (progress) progress.classList.remove('hidden');
     try {
+      await checkGenlayer();
       const txHash = await client.writeContract({
         address: contractStat,
         functionName: "set_nickname",
