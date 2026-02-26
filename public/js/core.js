@@ -19,7 +19,7 @@ let contractMochi = '0x8C06eD92CcDc05a23Ec2cEb6196f310717872878';
 let contractMochiQuest = '0xe0E74E58deD82caA331B5cF0B46E62A663767d5A';
 let contractQuestions = '0xB30Ff003081124CEf7947D41785EAD3BdbEda543';
 let evmContractQuestions = '0xD695d6Cdd5Fb389469Bd1Ee240a82778FAC4Fd5A';
-let evmContractDeveloper = '0x5F0D99Bf67549d30E6d23360342ead223BA00c18';
+let contractDeveloper = '0xabebdC0a8C2f6237D4AD38E47A8Ac550FCCE15A0';
 
 const BASE_SEPOLIA_RPC = "https://sepolia.base.org";
 const BASE_SEPOLIA_USDC= "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -277,8 +277,8 @@ function getChangedIds() {
     contractMochi,
     contractMochiQuest,
     contractQuestions,
+    contractDeveloper,
     evmContractQuestions,
-    evmContractDeveloper,
     questionsAbi,
     maskAddress,
     markChanged,

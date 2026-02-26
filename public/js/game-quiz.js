@@ -3,7 +3,8 @@ import {
     TransactionStatus,
     contractQuiz,
     getStat,
-    maskAddress
+    maskAddress,
+    fmt
   } from './core.js';
 
   const QUIZ_ANSWERS_KEY_PREFIX = 'quiz_answers_';
@@ -925,8 +926,16 @@ import {
           value.textContent = 'You did not answer this question';
           value.style.color = '#9ca3af';
         } else {
-          const text = String(myAnsForQuestion.answer || '').trim();
-          value.textContent = text || '[empty]';
+          if (isClosed) {
+              const myAnswer = answersArr.find(a => 
+                  String(a.id) === String(myAnsForQuestion.answer_id || '')
+              );
+              const text = String(myAnswer.answer || '').trim();
+              value.textContent = text || '[empty]';
+          } else {
+              const text = String(myAnsForQuestion.answer || '').trim();
+              value.textContent = text || '[empty]';
+          }
           value.style.color = '#111827';
         }
   

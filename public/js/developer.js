@@ -3,16 +3,64 @@ import {
     TransactionStatus,
     contractDeveloper,
     checkGenlayer,
-    maskAddress
+    maskAddress,
+    fmt
 } from './core.js';
 
 const DEVELOPER_ANSWERS_KEY = 'developer_answers';
 
 async function getMyDeveloper({ silent = false } = {}) {
     if (!client) return;
+
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const dataContainer = document.getElementById('gameContainer');
+    const emptyContainer = document.getElementById('emptyContainer');
+
+    if (!silent) {
+        if (dataContainer) dataContainer.classList.add('hidden');
+        if (emptyContainer) emptyContainer.classList.add('hidden');
+        if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+    } else {
+        if (dataContainer) dataContainer.classList.remove('hidden');
+        if (emptyContainer) emptyContainer.classList.add('hidden');
+        if (loadingIndicator) loadingIndicator.classList.add('hidden');
+    }
+    
+    try {
+        const game = await client.readContract({
+            address: contractDeveloper,
+            functionName: 'get_my_game',
+            args: [],
+        });
+        let res = JSON.parse(game);
+        if (loadingIndicator) loadingIndicator.classList.add('hidden');
+        if (res.error) {
+            renderQuizEmpty(res.error);
+        } else {
+            renderQuizData(res);
+        }
+        console.error('Success getting my quiz:', res);
+    } catch (error) {
+        if (!silent) {
+            if (dataContainer) dataContainer.classList.add('hidden');
+            if (emptyContainer) emptyContainer.classList.remove('hidden');
+        } else {
+            if (dataContainer) dataContainer.classList.remove('hidden');
+            if (emptyContainer) emptyContainer.classList.add('hidden');
+        }
+        if (loadingIndicator) loadingIndicator.classList.add('hidden');
+        console.error('Error getting my quiz:', error);
+    }
 }
 
 async function startDeveloper() {
+    if (!client) return;
+    const createBtn = document.getElementById('createBtn');
+    const startBtn = document.getElementById('startBtn');
+    const saveProgress = document.getElementById('saveProgress');
+    if (createBtn) createBtn.classList.add('hidden');
+    if (startBtn) startBtn.classList.add('hidden');
+    if (saveProgress) saveProgress.classList.remove('hidden');
     try {
         await checkGenlayer();
         const txHash = await client.writeContract({
@@ -28,20 +76,24 @@ async function startDeveloper() {
             interval: 2000,
         });
         console.error('Success start:', receipt);
+        if (saveProgress) saveProgress.classList.add('hidden');
         getMyDeveloper();
     } catch (error) {
       console.error('Error start:', error);
+      if (createBtn) createBtn.classList.add('hidden');
+      if (startBtn) startBtn.classList.remove('hidden');
+      if (saveProgress) saveProgress.classList.add('hidden');
     }
 }
 
 async function gameDeveloper(gameLang) {
     if (!client) return;
-    const submitOpenBtn = document.getElementById('openBtn');
-    const submitCloseBtn = document.getElementById('closeBtn');
-    const progress = document.getElementById('saveProgress');
-    if (submitOpenBtn) submitOpenBtn.classList.add('hidden');
-    if (submitCloseBtn) submitCloseBtn.classList.add('hidden');
-    if (progress) progress.classList.remove('hidden');
+    const createBtn = document.getElementById('createBtn');
+    const startBtn = document.getElementById('startBtn');
+    const saveProgress = document.getElementById('saveProgress');
+    if (createBtn) createBtn.classList.add('hidden');
+    if (startBtn) startBtn.classList.add('hidden');
+    if (saveProgress) saveProgress.classList.remove('hidden');
     try {
         await checkGenlayer();
         const txHash = await client.writeContract({
@@ -57,15 +109,13 @@ async function gameDeveloper(gameLang) {
             interval: 2000,
         });
         console.error('Success setting quiz:', receipt);
-        if (submitOpenBtn) submitOpenBtn.classList.remove('hidden');
-        if (submitCloseBtn) submitCloseBtn.classList.remove('hidden');
-        if (progress) progress.classList.add('hidden');
+        if (saveProgress) saveProgress.classList.add('hidden');
         getMyDeveloper();
     } catch (error) {
         console.error('Error setting quiz:', error);
-        if (submitOpenBtn) submitOpenBtn.classList.remove('hidden');
-        if (submitCloseBtn) submitCloseBtn.classList.remove('hidden');
-        if (progress) progress.classList.add('hidden');
+        if (createBtn) createBtn.classList.remove('hidden');
+        if (startBtn) startBtn.classList.add('hidden');
+        if (saveProgress) saveProgress.classList.add('hidden');
     }
 }
 
@@ -136,11 +186,374 @@ async function answerDeveloper() {
             interval: 2000,
         });
         console.error('Success setting answer quiz:', receipt);
-        getMyDeveloper({ silent: true });
+        getMyDeveloper({ silent: false });
     } catch (error) {
         console.error('Error setting answer quiz:', error);
         if (scoreBtn) scoreBtn.disabled = false;
     }
+}
+
+function renderQuizData(game) {
+    const dataContainer = document.getElementById('gameContainer');
+    const emptyContainer = document.getElementById('emptyContainer');
+    const stateContainer = document.getElementById('stateContainer');
+    const resultContainer = document.getElementById('resultContainer');
+  
+    const prevGameState = stateContainer ? stateContainer.dataset.mode : '';
+
+    if (dataContainer) dataContainer.classList.remove('hidden');
+    if (emptyContainer) emptyContainer.classList.add('hidden');
+
+    const isFinished = game.game_score;
+    const gs = game.game_state || {};
+    const st = gs.state;
+  
+    const isActiveState = !isFinished && (st === 'waiting' || st === 'quiz');
+  
+    if (isActiveState) {
+        if (!window.quizPollInterval) {
+            window.quizPollInterval = setInterval(() => {
+                getMyDeveloper({ silent: true });
+            }, 1000);
+        }
+    } else {
+        if (window.quizPollInterval) {
+            clearInterval(window.quizPollInterval);
+            window.quizPollInterval = null;
+        }
+    }
+
+    if (isFinished) {
+        resultContainer.classList.remove('hidden');
+        stateContainer.classList.add('hidden');
+        resultContainer.textContent = '';
+        renderQuizQuestionsWithAnswers(game);
+        stateContainer.dataset.mode = 'finished';
+    } else {
+        resultContainer.classList.add('hidden');
+        stateContainer.classList.remove('hidden');
+        if (stateContainer.dataset.mode !== st) {
+            stateContainer.textContent = '';
+            stateContainer.dataset.questionId = '';
+        }
+        stateContainer.dataset.mode = st || '';
+
+        if (st === 'waiting') {
+            renderQuizWaitingState(game);
+        } else if (st === 'scoring') {
+            renderQuizScoringState();
+        } else if (st === 'quiz') {
+            renderQuizQuestionState(game);
+        } else {
+            if (!prevGameState || prevGameState !== st) {
+                const p = document.createElement('p');
+                p.textContent = 'Waiting for game state...';
+                stateContainer.appendChild(p);
+            }
+        }
+    }
+}
+
+function renderQuizWaitingState(game) {
+    const stateContainer = document.getElementById('stateContainer');
+    if (!stateContainer) return;
+    stateContainer.textContent = '';
+  
+    const timer = document.createElement('div');
+    timer.id = 'quizTimer';
+    timer.style.marginTop = '1.5rem';
+    timer.style.fontWeight = '500';
+    timer.style.color = '#6b7280';
+    stateContainer.appendChild(timer);
+  
+    const startTs = Number(game.game_time);
+    if (!Number.isFinite(startTs) || startTs <= 0) {
+        timer.textContent = 'Waiting for quiz start...';
+        return;
+    }
+  
+    const nowSec = Date.now() / 1000;
+    const secs = Math.round(startTs - nowSec);
+  
+    if (secs <= 0) {
+        timer.textContent = 'Starting...';
+    } else {
+        timer.textContent = 'Quiz starts in ' + fmt(secs);
+    }
+}
+
+function renderQuizScoringState() {
+    const stateContainer = document.getElementById('stateContainer');
+    if (!stateContainer) return;
+    stateContainer.textContent = '';
+  
+    const text = document.createElement('p');
+    text.style.paddingTop = '1rem';
+    text.textContent = 'Please sign your answers so they can be scored.';
+    stateContainer.appendChild(text);
+  
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Score';
+    btn.className = 'btn';
+    btn.style.marginTop = '0.75rem';
+    stateContainer.appendChild(btn);
+  
+    btn.addEventListener('click', async () => {
+        await answerDeveloper();
+    });
+}
+
+function renderQuizQuestionState(game) {
+    const stateContainer = document.getElementById('stateContainer');
+    if (!stateContainer) return;
+  
+    const qState = game.game_state || {};
+    const q = qState.question;
+    if (!q) {
+      stateContainer.textContent = '';
+      const p = document.createElement('p');
+      p.textContent = 'No active question.';
+      stateContainer.appendChild(p);
+      stateContainer.dataset.questionId = '';
+      return;
+    }
+  
+    const currentId = String(q.id ?? '');
+    const prevId = stateContainer.dataset.questionId || '';
+  
+    if (prevId === currentId) {
+        updateQuizQuestionTimer(qState);
+        return;
+    }
+
+    stateContainer.textContent = '';
+    stateContainer.dataset.questionId = currentId;
+  
+    const timer = document.createElement('div');
+    timer.id = 'quizQuestionTimer';
+    timer.style.marginBottom = '0.75rem';
+    timer.style.fontWeight = '500';
+    timer.style.color = '#6b7280';
+    stateContainer.appendChild(timer);
+    updateQuizQuestionTimer(qState);
+  
+    const questionTitle = document.createElement('h2');
+    questionTitle.textContent = q.question || 'Question';
+    questionTitle.style.margin = '0 0 .75rem';
+    stateContainer.appendChild(questionTitle);
+  
+    const answersArr = Array.isArray(q.answers) ? q.answers : [];
+
+    const btnsWrap = document.createElement('div');
+    btnsWrap.style.display = 'flex';
+    btnsWrap.style.flexDirection = 'column';
+    btnsWrap.style.gap = '0.5rem';
+  
+    answersArr.forEach(ans => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn';
+        btn.textContent = ans.answer || '';
+        btn.style.textAlign = 'left';
+        btnsWrap.appendChild(btn);
+        btn.addEventListener('click', async () => {
+            try {
+                if (!window.WalletUI || !WalletUI.isConnected()) {
+                    throw new Error('Please connect your wallet first');
+                }
+                btn.classList.add('btn-selected');
+                WalletUI.sendDeveloperAnswer({
+                    questionId: q.id,
+                    answerId: ans.id
+                });
+            } catch (e) {
+                alert(e.message || String(e));
+            }
+        });
+    });
+  
+    stateContainer.appendChild(btnsWrap);
+  
+}
+
+function updateQuizQuestionTimer(qState) {
+    const timer = document.getElementById('quizQuestionTimer');
+    if (!timer) return;
+  
+    let label = 'Question is finishing...';
+    const finishTs = Number(qState.finish_time);
+    if (Number.isFinite(finishTs) && finishTs > 0) {
+        const nowSec = Date.now() / 1000;
+        const secs = Math.round(finishTs - nowSec);
+        if (secs > 0) {
+            label = 'Time left: ' + fmt(secs);
+        }
+    }
+    timer.textContent = label;
+}
+
+function renderQuizEmpty(error) {
+    const dataContainer = document.getElementById('gameContainer');
+    const emptyContainer = document.getElementById('emptyContainer');
+    const languageSelect = document.getElementById('languageSelect');
+    const createBtn = document.getElementById('createBtn');
+    const startBtn = document.getElementById('startBtn');
+    const saveProgress = document.getElementById('saveProgress');
+    if (saveProgress) saveProgress.classList.add('hidden');
+    if (dataContainer) dataContainer.classList.add('hidden');
+    if (emptyContainer) emptyContainer.classList.remove('hidden');
+    if (error === 'Game not started') {
+        if (languageSelect) languageSelect.classList.add('hidden');
+        if (createBtn) createBtn.classList.add('hidden');
+        if (startBtn) startBtn.classList.remove('hidden');
+    } else {
+        if (languageSelect) languageSelect.classList.remove('hidden');
+        if (createBtn) createBtn.classList.remove('hidden');
+        if (startBtn) startBtn.classList.add('hidden');
+    }
+}
+
+function renderQuizQuestionsWithAnswers(game) {
+    const root = document.getElementById('resultContainer');
+    if (!root) return;
+  
+    const questions = game.game_questions || [];
+    if (!Array.isArray(questions) || questions.length === 0) return;
+    const me = game.game_score;
+  
+    const myAnswers = me ? parsePlayerQuizAnswers(me.answers || '') : [];
+  
+    const block = document.createElement('div');
+    block.id = 'quizQuestionsBlock';
+    block.style.marginTop = '1.5rem';
+  
+    const title = document.createElement('h2');
+    title.textContent = 'Questions and answers';
+    title.style.margin = '0 0 .75rem';
+    block.appendChild(title);
+  
+    const list = document.createElement('ol');
+    list.style.paddingLeft = '1.25rem';
+    list.style.margin = '1rem 0';
+    list.style.display = 'grid';
+    list.style.rowGap = '0.75rem';
+  
+    questions.forEach((q, index) => {
+        const li = document.createElement('li');
+        li.style.listStyle = 'decimal';
+        li.style.padding = '0.75rem 0';
+        li.style.borderBottom = '1px solid #e5e7eb';
+    
+        const questionText = document.createElement('div');
+        questionText.textContent = q.question || `Question #${index + 1}`;
+        questionText.style.fontWeight = '600';
+        questionText.style.fontSize = '14px';
+        li.appendChild(questionText);
+    
+        const answersBlock = document.createElement('ul');
+        answersBlock.style.margin = '0.5rem 0 0';
+        answersBlock.style.paddingLeft = '1rem';
+    
+        const answersArr = Array.isArray(q.answers) ? q.answers : [];
+    
+        const correctId = String(q.correct ?? '');
+        if (answersArr.length === 0) {
+            const aLi = document.createElement('li');
+            aLi.textContent = 'No answers';
+            aLi.style.fontSize = '13px';
+            aLi.style.color = '#9ca3af';
+            answersBlock.appendChild(aLi);
+        } else {
+            answersArr.forEach(ans => {
+                const aLi = document.createElement('li');
+                aLi.textContent = ans.answer || '';
+                aLi.style.fontSize = '13px';
+                const isCorrect = String(ans.id) === correctId;
+                if (isCorrect) {
+                    aLi.style.color = '#16a34a';
+                    aLi.style.fontWeight = '600';
+                } else {
+                    aLi.style.color = '#9ca3af';
+                }
+                answersBlock.appendChild(aLi);
+            });
+        }
+    
+        li.appendChild(answersBlock);
+    
+        if (myAnswers.length > 0) {
+            const myAnsForQuestion = myAnswers.find(a => String(a.question_id) === String(q.id));
+    
+            const myBlock = document.createElement('div');
+            myBlock.style.marginTop = '0.5rem';
+            myBlock.style.fontSize = '13px';
+    
+            const label = document.createElement('div');
+            label.textContent = 'Your answer:';
+            label.style.fontWeight = '500';
+            label.style.color = '#4b5563';
+            myBlock.appendChild(label);
+    
+            const value = document.createElement('div');
+            if (!myAnsForQuestion) {
+                value.textContent = 'You did not answer this question';
+                value.style.color = '#9ca3af';
+            } else {
+                const myAnswer = answersArr.find(a => 
+                    String(a.id) === String(myAnsForQuestion.answer_id || '')
+                );
+                const text = String(myAnswer.answer || '').trim();
+                value.textContent = text || '[empty]';
+                value.style.color = '#111827';
+            }
+    
+            myBlock.appendChild(value);
+            li.appendChild(myBlock);
+        }
+    
+        list.appendChild(li);
+    });
+  
+    block.appendChild(list);
+    root.appendChild(block);
+}
+
+function parsePlayerQuizAnswers(raw) {
+    if (!raw) return [];
+    let arr;
+    try {
+        const normalized = raw
+            .replace(/'/g, '"')   
+            .replace(/\\"/g, '"') 
+            .replace(/"{/g, '{')     
+            .replace(/}"/g, '}'); 
+    
+        arr = JSON.parse(normalized);
+    } catch (e) {
+        console.error('parsePlayerQuizAnswers: cannot parse outer level', raw, e);
+        return [];
+    }
+  
+    if (!Array.isArray(arr)) {
+        console.warn('parsePlayerQuizAnswers: not an array', arr);
+        return [];
+    }
+  
+    return arr.map((item, idx) => {
+        if (typeof item === 'string') {
+            try {
+            return JSON.parse(item);
+            } catch (e) {
+            console.error('parsePlayerQuizAnswers: inner JSON error', idx, item, e);
+            return null;
+            }
+        }
+        if (typeof item === 'object' && item !== null) {
+            return item;
+        }
+        return null;
+    }).filter(Boolean);
 }
 
 function getQuizAnswersKey() {
@@ -177,6 +590,7 @@ function appendQuizAnswer(questionId, sealed) {
 
 export {
     sendDeveloperAnswer,
+    startDeveloper,
     answerDeveloper,
     gameDeveloper,
     getMyDeveloper
