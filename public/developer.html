@@ -53,6 +53,45 @@
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
+      #nftMintContainer {
+        margin-bottom: 1.5rem;
+      }
+      #nftContainer {
+        margin-bottom: 1.5rem;
+      }
+      .nft-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+      }
+      .nft-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 8px;
+        text-align: center;
+        font-size: 12px;
+      }
+      .nft-preview {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        border-radius: 6px;
+        background: #f3f4f6;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #9ca3af;
+        font-size: 11px;
+        background-size: cover;
+        background-position: center;
+      }
+      .nft-meta-line {
+        margin: 0;
+        line-height: 1.25;
+      }
+      .nft-meta-line strong {
+        font-weight: 600;
+      }
     </style>
   </head>
   <body data-page-name="developer">
@@ -77,6 +116,41 @@
         <p>Loading...</p>
       </div>
       <div id="gameContainer" class="hidden">
+        <div id="nftContainer">
+          <div class="nft-grid">
+            <div class="nft-card">
+              <div class="nft-preview" style="background-image: url('https://yellow-adverse-tyrannosaurus-203.mypinata.cloud/ipfs/bafybeifmmsvpc4mfa3jwm5iqj2e6maq2mdx6y6jrbygbdfvdwc57qbs4te');"></div>
+              <p class="nft-meta-line">Common</p>
+              <p class="nft-meta-line">Score 501–1999</p>
+            </div>
+            <div class="nft-card">
+              <div class="nft-preview" style="background-image: url('https://yellow-adverse-tyrannosaurus-203.mypinata.cloud/ipfs/bafybeid3aahorfabzapftcmpen5ktmnmocexjm35evcrxqh4q7qefdubgi');"></div>
+              <p class="nft-meta-line">Rare</p>
+              <p class="nft-meta-line">Score 2000–2899</p>
+            </div>
+            <div class="nft-card">
+              <div class="nft-preview" style="background-image: url('https://yellow-adverse-tyrannosaurus-203.mypinata.cloud/ipfs/bafybeie5muqknpyizvdnelj6gglmwtcoyxmrzndblrv6xlqfoauhfmpsdi');"></div>
+              <p class="nft-meta-line">Epic</p>
+              <p class="nft-meta-line">Score 2900–3799</p>
+            </div>
+            <div class="nft-card">
+              <div class="nft-preview" style="background-image: url('https://yellow-adverse-tyrannosaurus-203.mypinata.cloud/ipfs/bafybeifxrxdcrnnw2jeyg7tq5egjevkdirmbuo2ycv6dxahn6aoxhx5634');"></div>
+              <p class="nft-meta-line">Legendary</p>
+              <p class="nft-meta-line">Score 3800–4699</p>
+            </div>
+            <div class="nft-card">
+              <div class="nft-preview" style="background-image: url('https://yellow-adverse-tyrannosaurus-203.mypinata.cloud/ipfs/bafybeicvlsw5s4hwbo36nwao2uih246iirbmsm4rfkqudytxemtnfbyvwm');"></div>
+              <p class="nft-meta-line">Mythic</p>
+              <p class="nft-meta-line">Score 4700–5000</p>
+            </div>
+          </div>
+        </div>
+        <div id="nftMintContainer">
+          <div class="row">
+            <button id="mintBtn" class="btn" disabled>Mint NFT (0.0001 ETH)</button>
+            <div id="mintProgress" class="spinner2 hidden" aria-label="Loading"></div>
+        </div>
+        </div>
         <div id="stateContainer" class="hidden">
         </div>
         <div id="resultContainer" class="hidden">

@@ -62,6 +62,7 @@ async function startDeveloper() {
     if (startBtn) startBtn.classList.add('hidden');
     if (saveProgress) saveProgress.classList.remove('hidden');
     try {
+        clearQuizAnswers();
         await checkGenlayer();
         const txHash = await client.writeContract({
             address: contractDeveloper,
@@ -427,10 +428,36 @@ function renderQuizQuestionsWithAnswers(game) {
     const block = document.createElement('div');
     block.id = 'quizQuestionsBlock';
     block.style.marginTop = '1.5rem';
+
+    const titleResult = document.createElement('h2');
+    titleResult.textContent = 'Your result: ' + me.score + ' of 5000';
+    titleResult.style.margin = '0 0 .75rem';
+    block.appendChild(titleResult);
+
+    const scoreResult = Number(me.score);
+    if (scoreResult > 500) {
+        let rarity = 'common';
+        if (scoreResult >= 2000) rarity = 'rare';
+        if (scoreResult >= 2900) rarity = 'epic';
+        if (scoreResult >= 3800) rarity = 'legendary';
+        if (scoreResult >= 4700) rarity = 'mythic';
+    
+        const resultText = document.createElement('div');
+        resultText.textContent = 'You have been whitelisted to mint a ' + rarity + ' Real GenLayer Developer NFT.';
+        resultText.style.fontWeight = '400';
+        resultText.style.fontSize = '16px';
+        block.appendChild(resultText);
+    } else {
+        const resultText = document.createElement('div');
+        resultText.textContent = 'You have not been whitelisted to mint a Real GenLayer Developer NFT.';
+        resultText.style.fontWeight = '400';
+        resultText.style.fontSize = '16px';
+        block.appendChild(resultText);
+    }
   
     const title = document.createElement('h2');
     title.textContent = 'Questions and answers';
-    title.style.margin = '0 0 .75rem';
+    title.style.margin = '1.75rem 0 .75rem';
     block.appendChild(title);
   
     const list = document.createElement('ol');
@@ -558,6 +585,11 @@ function parsePlayerQuizAnswers(raw) {
 
 function getQuizAnswersKey() {
     return DEVELOPER_ANSWERS_KEY;
+}
+
+function clearQuizAnswers() {
+    const key = getQuizAnswersKey();
+    localStorage.removeItem(key);
 }
 
 function loadQuizAnswers() {

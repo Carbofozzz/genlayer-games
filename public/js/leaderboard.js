@@ -176,7 +176,7 @@ import {
       const rating = await client.readContract({
         address: contractMochi,
         functionName: 'get_rating',
-        args: [50],
+        args: [250],
       });
       let res = JSON.parse(rating);
       console.error('Success getting leaderboard nft: ', res);
