@@ -32,11 +32,15 @@ async function checkNft({ silent = false } = {}) {
         const signer = provider.getSigner();
         const userAddress = await signer.getAddress();
         const nftContract = new ethers.Contract(evmContractDeveloper, developerAbi, signer);
+        const min = await nftContract.tokenCounter();
         const max = await nftContract.maxSupply();
+        console.log("current supply:", min.toString());
         console.log("max supply:", max.toString());
         const balance = await nftContract.balanceOf(userAddress);
         console.log("balance nft:", balance.toString());
-        if (mintStat) mintStat.textContent = '450 of the ' + max.toString() + ' NFTs have already been minted.';
+        const whitelisted = await nftContract.checkWhitelisted(userAddress);
+        console.log("whitelisted nft:", whitelisted.toString());
+        if (mintStat) mintStat.textContent = min.toString() + ' of the ' + max.toString() + ' NFTs have already been minted.';
         if (balance > 0) {
             const id = await nftContract.getId();
             console.log("id nft:", id.toString());
@@ -48,8 +52,12 @@ async function checkNft({ silent = false } = {}) {
             const tx = 'https://sepolia.basescan.org/nft/' + evmContractDeveloper + '/' + id.toString();
             if (mintState) mintState.innerHTML = 'You have been already minted your NFT (<a href="' + tx + '" target="_blank">Check</a>)';
         } else {
-            if (mintBtn) mintBtn.disabled = false;
-            if (mintState) mintState.textContent = 'You have not whitelisted yet';
+            if (mintBtn) mintBtn.disabled = !whitelisted;
+            if (whitelisted) {
+                if (mintState) mintState.textContent = '';
+            } else {
+                if (mintState) mintState.textContent = 'You have not whitelisted yet';
+            }
         }
         if (!silent) {
             getMyDeveloper({ silent: false });
@@ -81,7 +89,9 @@ async function mintDeveloper() {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         const nftContract = new ethers.Contract(evmContractDeveloper, developerAbi, signer);
-        const tx = await nftContract.mint();
+        const mintPrice = await nftContract.mintPrice();
+        console.log("mint() price:", mintPrice.toString());
+        const tx = await nftContract.mint({ value: mintPrice });
         console.log("mint() tx sent:", tx.hash);
         const receipt = await tx.wait();
         console.log("mint() tx mined:", receipt.transactionHash);

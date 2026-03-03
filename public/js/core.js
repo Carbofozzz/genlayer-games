@@ -20,7 +20,7 @@ let contractMochiQuest = '0xe0E74E58deD82caA331B5cF0B46E62A663767d5A';
 let contractQuestions = '0xB30Ff003081124CEf7947D41785EAD3BdbEda543';
 let evmContractQuestions = '0xD695d6Cdd5Fb389469Bd1Ee240a82778FAC4Fd5A';
 let contractDeveloper = '0xabebdC0a8C2f6237D4AD38E47A8Ac550FCCE15A0';
-let evmContractDeveloper = '0xd9D7C4081E4c9Ea6D60D5914237f07D47b24128c';
+let evmContractDeveloper = '0xdD3BC70cBa7700dC51718a2773ce317d25F0Bbef';
 
 const BASE_SEPOLIA_RPC = "https://sepolia.base.org";
 const BASE_SEPOLIA_USDC= "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -45,8 +45,11 @@ const developerAbi = [
   "function mint() external payable",
   "function tokenURI(uint256 tokenId) public view override returns (string memory)",
   "function balanceOf(address user) public view override returns (uint256)",
+  "function checkWhitelisted(address wallet) public view returns (bool)",
   "function getId() public view returns (uint256)",
-  "function maxSupply() view returns (uint256)"
+  "function maxSupply() view returns (uint256)",
+  "function tokenCounter() view returns (uint256)",
+  "function mintPrice() view returns (uint256)"
 ];
 
 const FLAG_KEY = 'answeredFlags';
