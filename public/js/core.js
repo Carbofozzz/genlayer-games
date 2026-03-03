@@ -20,6 +20,7 @@ let contractMochiQuest = '0xe0E74E58deD82caA331B5cF0B46E62A663767d5A';
 let contractQuestions = '0xB30Ff003081124CEf7947D41785EAD3BdbEda543';
 let evmContractQuestions = '0xD695d6Cdd5Fb389469Bd1Ee240a82778FAC4Fd5A';
 let contractDeveloper = '0xabebdC0a8C2f6237D4AD38E47A8Ac550FCCE15A0';
+let evmContractDeveloper = '0xd9D7C4081E4c9Ea6D60D5914237f07D47b24128c';
 
 const BASE_SEPOLIA_RPC = "https://sepolia.base.org";
 const BASE_SEPOLIA_USDC= "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -39,6 +40,13 @@ const questionsAbi = [
   "function claimableUnits(address user) external view returns (uint256)",
   "event StringReceived(uint32 indexed sourceChainId, address indexed sourceContract, address indexed user, string action)",
   "event BetPlaced(address indexed user, string randomId)"
+];
+const developerAbi = [
+  "function mint() external payable",
+  "function tokenURI(uint256 tokenId) public view override returns (string memory)",
+  "function balanceOf(address user) public view override returns (uint256)",
+  "function getId() public view returns (uint256)",
+  "function maxSupply() view returns (uint256)"
 ];
 
 const FLAG_KEY = 'answeredFlags';
@@ -279,7 +287,9 @@ function getChangedIds() {
     contractQuestions,
     contractDeveloper,
     evmContractQuestions,
+    evmContractDeveloper,
     questionsAbi,
+    developerAbi,
     maskAddress,
     markChanged,
     clearChanged,

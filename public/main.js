@@ -18,7 +18,7 @@ import {
   import { gamePunch, joke } from './js/game-punch.js';
   import { gameCook, answerCook } from './js/game-cook.js';
   import { gameQuiz, answerQuiz, sendQuizAnswer } from './js/game-quiz.js';
-  import { sendDeveloperAnswer, answerDeveloper, gameDeveloper, startDeveloper } from './js/developer.js';
+  import { sendDeveloperAnswer, answerDeveloper, gameDeveloper, startDeveloper, mintDeveloper } from './js/developer.js';
   import { catBeauty, getContest, getShareImage } from './js/contest.js';
   import { dogBeauty, getDogContest, getDogShareImage } from './js/contest-dog.js';
   import { setNickname } from './js/leaderboard.js';
@@ -67,7 +67,8 @@ import {
     sendDeveloperAnswer,
     answerDeveloper,
     gameDeveloper,
-    startDeveloper
+    startDeveloper,
+    mintDeveloper
   };
   
   if (typeof window !== 'undefined') {

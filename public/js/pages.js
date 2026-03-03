@@ -5,7 +5,7 @@ import { getGameMatch, getMyMatch } from './game-match.js';
 import { getGamePunch, getMyPunch } from './game-punch.js';
 import { getGameCook, getMyCook } from './game-cook.js';
 import { getGameQuiz, getMyQuiz } from './game-quiz.js';
-import { getMyDeveloper } from './developer.js';
+import { checkNft } from './developer.js';
 import { getContest, getContests } from './contest.js';
 import { getDogContest, getDogContests } from './contest-dog.js';
 import { getGames } from './profile.js';
@@ -76,7 +76,7 @@ function checkPageImpl() {
         getQuestions(true);
         break;
       case 'developer':
-        getMyDeveloper();
+        checkNft();
         break;
       default:
         console.log('Page has no data-page-name');

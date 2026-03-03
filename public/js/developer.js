@@ -2,12 +2,98 @@ import {
     client,
     TransactionStatus,
     contractDeveloper,
+    evmContractDeveloper,
+    developerAbi,
     checkGenlayer,
-    maskAddress,
+    ethers,
+    checkBaseSepolia,
     fmt
 } from './core.js';
 
 const DEVELOPER_ANSWERS_KEY = 'developer_answers';
+
+async function checkNft({ silent = false } = {}) {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const dataContainer = document.getElementById('gameContainer');
+    const emptyContainer = document.getElementById('emptyContainer');
+    const mintBtn = document.getElementById('mintBtn');
+    const mintState = document.getElementById('mintState');
+    const mintStat = document.getElementById('mintStat');
+    const mintProgress = document.getElementById('mintProgress');
+
+    if (!silent) {
+        if (dataContainer) dataContainer.classList.add('hidden');
+        if (emptyContainer) emptyContainer.classList.add('hidden');
+        if (loadingIndicator) loadingIndicator.classList.remove('hidden');
+    }
+    try {
+        await checkBaseSepolia();
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const userAddress = await signer.getAddress();
+        const nftContract = new ethers.Contract(evmContractDeveloper, developerAbi, signer);
+        const max = await nftContract.maxSupply();
+        console.log("max supply:", max.toString());
+        const balance = await nftContract.balanceOf(userAddress);
+        console.log("balance nft:", balance.toString());
+        if (mintStat) mintStat.textContent = '450 of the ' + max.toString() + ' NFTs have already been minted.';
+        if (balance > 0) {
+            const id = await nftContract.getId();
+            console.log("id nft:", id.toString());
+            const uri = await nftContract.tokenURI(id);
+            const response = await (await fetch(uri)).text();
+            const meta = JSON.parse(response);
+            console.log(`NFT image: ${meta.image}`);
+            if (mintBtn) mintBtn.disabled = true;
+            const tx = 'https://sepolia.basescan.org/nft/' + evmContractDeveloper + '/' + id.toString();
+            if (mintState) mintState.innerHTML = 'You have been already minted your NFT (<a href="' + tx + '" target="_blank">Check</a>)';
+        } else {
+            if (mintBtn) mintBtn.disabled = false;
+            if (mintState) mintState.textContent = 'You have not whitelisted yet';
+        }
+        if (!silent) {
+            getMyDeveloper({ silent: false });
+        }
+        if (mintBtn) mintBtn.classList.remove('hidden');
+        if (mintState) mintState.classList.remove('hidden');
+        if (mintProgress) mintProgress.classList.add('hidden');
+    } catch (error) {
+        console.error('Error in checkNft:', error);
+        if (!silent) {
+            getMyDeveloper({ silent: false });
+        }
+        if (mintBtn) mintBtn.classList.remove('hidden');
+        if (mintState) mintState.classList.remove('hidden');
+        if (mintProgress) mintProgress.classList.add('hidden');
+    }
+}
+
+async function mintDeveloper() {
+    const mintBtn = document.getElementById('mintBtn');
+    const mintState = document.getElementById('mintState');
+    const mintProgress = document.getElementById('mintProgress');
+    if (mintBtn) mintBtn.classList.add('hidden');
+    if (mintState) mintState.classList.add('hidden');
+    if (mintProgress) mintProgress.classList.remove('hidden');
+    if (mintBtn) mintBtn.disabled = true;
+    try {
+        await checkBaseSepolia();
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        const nftContract = new ethers.Contract(evmContractDeveloper, developerAbi, signer);
+        const tx = await nftContract.mint();
+        console.log("mint() tx sent:", tx.hash);
+        const receipt = await tx.wait();
+        console.log("mint() tx mined:", receipt.transactionHash);
+        checkNft({ silent: true });
+    } catch (error) {
+        console.error('Error in mintDeveloper:', error);
+        if (mintBtn) mintBtn.classList.remove('hidden');
+        if (mintState) mintState.classList.remove('hidden');
+        if (mintProgress) mintProgress.classList.add('hidden');
+        if (mintBtn) mintBtn.disabled = false;
+    }
+}
 
 async function getMyDeveloper({ silent = false } = {}) {
     if (!client) return;
@@ -78,7 +164,7 @@ async function startDeveloper() {
         });
         console.error('Success start:', receipt);
         if (saveProgress) saveProgress.classList.add('hidden');
-        getMyDeveloper();
+        getMyDeveloper({ silent: false });
     } catch (error) {
       console.error('Error start:', error);
       if (createBtn) createBtn.classList.add('hidden');
@@ -111,7 +197,7 @@ async function gameDeveloper(gameLang) {
         });
         console.error('Success setting quiz:', receipt);
         if (saveProgress) saveProgress.classList.add('hidden');
-        getMyDeveloper();
+        getMyDeveloper({ silent: false });
     } catch (error) {
         console.error('Error setting quiz:', error);
         if (createBtn) createBtn.classList.remove('hidden');
@@ -435,15 +521,15 @@ function renderQuizQuestionsWithAnswers(game) {
     block.appendChild(titleResult);
 
     const scoreResult = Number(me.score);
-    if (scoreResult > 500) {
+    if (scoreResult >= 500) {
         let rarity = 'common';
-        if (scoreResult >= 2000) rarity = 'rare';
-        if (scoreResult >= 2900) rarity = 'epic';
-        if (scoreResult >= 3800) rarity = 'legendary';
-        if (scoreResult >= 4700) rarity = 'mythic';
+        if (scoreResult > 2600) rarity = 'rare';
+        if (scoreResult > 3500) rarity = 'epic';
+        if (scoreResult > 4200) rarity = 'legendary';
+        if (scoreResult > 4700) rarity = 'mythic';
     
         const resultText = document.createElement('div');
-        resultText.textContent = 'You have been whitelisted to mint a ' + rarity + ' Real GenLayer Developer NFT.';
+        resultText.textContent = 'You have been whitelisted to mint a ' + rarity + ' Real GenLayer Developer NFT. If you have just completed the quiz, minting will be available in a couple of minutes.';
         resultText.style.fontWeight = '400';
         resultText.style.fontSize = '16px';
         block.appendChild(resultText);
@@ -621,9 +707,11 @@ function appendQuizAnswer(questionId, sealed) {
 }
 
 export {
+    mintDeveloper,
     sendDeveloperAnswer,
     startDeveloper,
     answerDeveloper,
     gameDeveloper,
-    getMyDeveloper
+    getMyDeveloper,
+    checkNft
 };
