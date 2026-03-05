@@ -6,7 +6,7 @@ import {
     developerAbi,
     checkGenlayer,
     ethers,
-    checkBaseSepolia,
+    checkBaseMainnet,
     fmt
 } from './core.js';
 
@@ -36,7 +36,7 @@ async function checkNft({ silent = false } = {}) {
         if (loadingIndicator) loadingIndicator.classList.remove('hidden');
     }
     try {
-        await checkBaseSepolia();
+        await checkBaseMainnet();
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         const userAddress = await signer.getAddress();
@@ -103,7 +103,7 @@ async function mintDeveloper() {
     if (mintProgress) mintProgress.classList.remove('hidden');
     if (mintBtn) mintBtn.disabled = true;
     try {
-        await checkBaseSepolia();
+        await checkBaseMainnet();
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         const nftContract = new ethers.Contract(evmContractDeveloper, developerAbi, signer);

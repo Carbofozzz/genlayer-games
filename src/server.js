@@ -5,7 +5,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import AWS from 'aws-sdk';
-import { evmNetwork, baseSepoliaNetwork } from './config/network.js';
+import { evmNetwork, baseSepoliaNetwork, baseMainnetNetwork } from './config/network.js';
 import crypto from 'crypto';
 import sharp from 'sharp';
 import fetch from 'node-fetch';
@@ -68,6 +68,10 @@ app.get('/api/config/network', (_req, res) => {
 
 app.get('/api/config/network_base_sepolia', (_req, res) => {
   return res.json(baseSepoliaNetwork);
+});
+
+app.get('/api/config/network_base_mainnet', (_req, res) => {
+  return res.json(baseMainnetNetwork);
 });
 
 app.post('/api/signature', async (req, res) => {

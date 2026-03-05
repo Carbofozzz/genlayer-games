@@ -21,3 +21,15 @@ export const baseSepoliaNetwork = {
   },
   blockExplorerUrls: ('https://etherscan.io').split(','),
 };
+
+export const baseMainnetNetwork = {
+  chainIdHex: '0x2105',
+  chainName: 'Base Mainnet',
+  rpcUrls: ('https://mainnet.base.org').split(','),
+  nativeCurrency: {
+    name: 'ETH',
+    symbol: 'ETH',
+    decimals: 18,
+  },
+  blockExplorerUrls: ('https://etherscan.io').split(','),
+};

@@ -9,6 +9,8 @@ import random
 import base64
 import hashlib
 
+genvm_eth = gl.evm
+
 @gl.contract_interface
 class StatIface:
     class View:
@@ -170,6 +172,18 @@ class DeveloperQuiz(gl.Contract):
         self.target_contract = target_contract
 
     @gl.public.write
+    def change_owner(self, address: str):
+        self._only_owner()
+        self.admins.clear()
+        self.owner = Address(address)
+        self.admins.append(Address(address))
+
+    @gl.public.write
+    def drop_game(self, address: str):
+        self._only_owner()
+        self.active_games.pop(Address(address), None)
+
+    @gl.public.write
     def start_game(self) -> None:
         sender_address = gl.message.sender_address
         game_cache = self.active_games.get(sender_address)
@@ -189,21 +203,21 @@ class DeveloperQuiz(gl.Contract):
 
     @gl.public.write
     def score_answers(self, answers: list[str]) -> None:
-        sender_address = gl.message.sender_address
-        game_cache = self.active_games.get(sender_address, None)
-        if game_cache is None:
-            raise Exception("Game not found")
-        if game_cache.game_started == False:
-            raise Exception("Game has not started")
-        if not _check_time_scoring(game_cache, gl.message_raw["datetime"]):
-            raise Exception("Game are not scoring")
-        if game_cache.game_scored:
-            raise Exception("You have been already scored")
-
-        decrypted = []
-        for answer in answers:
-            decrypted.append(self.decrypt(answer, self.secret))
         try:
+            sender_address = gl.message.sender_address
+            game_cache = self.active_games.get(sender_address, None)
+            if game_cache is None:
+                raise Exception("Game not found")
+            if game_cache.game_started == False:
+                raise Exception("Game has not started")
+            if game_cache.game_scored:
+                raise Exception("You have been already scored")
+            if _check_time_active(game_cache, gl.message_raw["datetime"]):
+                raise Exception("Game are not scoring")
+
+            decrypted = []
+            for answer in answers:
+                decrypted.append(self.decrypt(answer, self.secret))
             score = 0
             for d in decrypted:
                 dj = json.loads(d)
@@ -222,20 +236,21 @@ class DeveloperQuiz(gl.Contract):
             game_cache.game_score = score_item
             game_cache.game_scored = True
             # bridge
-            message = json.dumps({ "address": sender_address.as_hex, "rarity": "1" })
-            if score_item.score_value > 2600:
-                message = json.dumps({ "address": sender_address.as_hex, "rarity": "2" })
-            if score_item.score_value > 3500:
-                message = json.dumps({ "address": sender_address.as_hex, "rarity": "3" })
-            if score_item.score_value > 4200:
-                message = json.dumps({ "address": sender_address.as_hex, "rarity": "4" })
-            if score_item.score_value > 4700:
-                message = json.dumps({ "address": sender_address.as_hex, "rarity": "5" })
-            abi = [str]
-            encoder = genvm_eth.MethodEncoder("", abi, bool)
-            message_bytes = encoder.encode_call([message])[4:]
-            bridge_contract = gl.get_contract_at(self.bridge_sender)
-            bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
+            if score_item.score_value > 499:
+                message = json.dumps({ "address": sender_address.as_hex, "rarity": "1" })
+                if score_item.score_value > 1600:
+                    message = json.dumps({ "address": sender_address.as_hex, "rarity": "2" })
+                if score_item.score_value > 2600:
+                    message = json.dumps({ "address": sender_address.as_hex, "rarity": "3" })
+                if score_item.score_value > 3500:
+                    message = json.dumps({ "address": sender_address.as_hex, "rarity": "4" })
+                if score_item.score_value > 4300:
+                    message = json.dumps({ "address": sender_address.as_hex, "rarity": "5" })
+                abi = [str]
+                encoder = genvm_eth.MethodEncoder("", abi, bool)
+                message_bytes = encoder.encode_call([message])[4:]
+                bridge_contract = gl.get_contract_at(self.bridge_sender)
+                bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
             self.error = str(score)
         except Exception as e:
             self.error = str(e)
@@ -264,7 +279,8 @@ Find and analyze the main article on {web_data} and create {qty} quiz questions 
 These should not be trivial questions, but rather interesting ones that require mental effort to answer correctly.
 
 Output:
-A JSON-array with a key-value pair of a question and answer and 3 wrong answers.
+A JSON-array with a key-value pair of a question and answer and 3 wrong answers. 
+Wrong answers should not be shorter or clearly indicate that they are incorrect; all wrong options should create the illusion that they could be correct answers.
 Question, answer, and wrong answers must be translated into {lang}.
 
 Return a JSON-array with the the element fields as follows:
@@ -370,6 +386,20 @@ This result should be perfectly parsable by a JSON parser without errors.
         return self.web_link
 
     @gl.public.view
+    def get_user_game(self, address: str) -> dict:
+        self._only_owner()
+        sender_address = Address(address)
+        game_cache = self.active_games.get(sender_address)
+        try:
+            if game_cache is not None:
+                game = game_cache.to_dict(gl.message_raw["datetime"])  
+                nicknames = StatIface(self.stat).view().get_nicknames()
+                return json.dumps(_select_game(game, nicknames, sender_address))
+            return json.dumps({ "error": "Game not found" })
+        except Exception as e:
+            return json.dumps({ "error": str(e) })
+
+    @gl.public.view
     def get_my_game(self) -> dict:
         sender_address = gl.message.sender_address
         game_cache = self.active_games.get(sender_address)
@@ -466,10 +496,6 @@ def _parse_questions(questions: TreeMap[str, Question], admin: bool) -> dict:
 
 def _check_time_active(game: Game, start_time: str) -> bool:
     return game.game_started == True and float(_convert_time(start_time, 0)) - float(game.game_start_time) < float(game.game_duration)
-
-def _check_time_scoring(game: Game, start_time: str) -> bool:
-    score_time = float(_convert_time(start_time, 0)) - float(game.game_start_time) - float(game.game_duration) > 0 
-    return _check_time_active(game, start_time) and score_time
 
 def _calculate_game_duration(questions: TreeMap[str, Question]) -> float:
     result = 0

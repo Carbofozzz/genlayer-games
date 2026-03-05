@@ -20,7 +20,7 @@ let contractMochiQuest = '0xe0E74E58deD82caA331B5cF0B46E62A663767d5A';
 let contractQuestions = '0xB30Ff003081124CEf7947D41785EAD3BdbEda543';
 let evmContractQuestions = '0xD695d6Cdd5Fb389469Bd1Ee240a82778FAC4Fd5A';
 let contractDeveloper = '0xBF93212155fFDA043E629E9bF55F2dC5afc686DA';
-let evmContractDeveloper = '0xdD3BC70cBa7700dC51718a2773ce317d25F0Bbef';
+let evmContractDeveloper = '0x88C79F686eB331F4188612b4eF8B17cA284f8Cdb';
 
 const BASE_SEPOLIA_RPC = "https://sepolia.base.org";
 const BASE_SEPOLIA_USDC= "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -218,6 +218,11 @@ function getChangedIds() {
     checkNet(net)
   }
 
+  async function checkBaseMainnet() {
+    const net = await (await fetch('/api/config/network_base_mainnet')).json();
+    checkNet(net)
+  }
+
   async function checkNet(net) {
     if (!window.ethereum) throw new Error('No wallet');
     try {
@@ -312,6 +317,7 @@ function getChangedIds() {
     fmt,
     checkGenlayer,
     checkBaseSepolia,
+    checkBaseMainnet,
     getUSDCBalance,
     getUSDC,
     ethers
