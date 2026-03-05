@@ -16,6 +16,7 @@ async function checkNft({ silent = false } = {}) {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const dataContainer = document.getElementById('gameContainer');
     const emptyContainer = document.getElementById('emptyContainer');
+    const nftContainer = document.getElementById('nftWrapper');
     const mintBtn = document.getElementById('mintBtn');
     const mintState = document.getElementById('mintState');
     const mintStat = document.getElementById('mintStat');
@@ -24,6 +25,7 @@ async function checkNft({ silent = false } = {}) {
     if (!silent) {
         if (dataContainer) dataContainer.classList.add('hidden');
         if (emptyContainer) emptyContainer.classList.add('hidden');
+        if (nftContainer) nftContainer.classList.add('hidden');
         if (loadingIndicator) loadingIndicator.classList.remove('hidden');
     }
     try {
@@ -111,10 +113,12 @@ async function getMyDeveloper({ silent = false } = {}) {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const dataContainer = document.getElementById('gameContainer');
     const emptyContainer = document.getElementById('emptyContainer');
+    const nftContainer = document.getElementById('nftWrapper');
 
     if (!silent) {
         if (dataContainer) dataContainer.classList.add('hidden');
         if (emptyContainer) emptyContainer.classList.add('hidden');
+        if (nftContainer) nftContainer.classList.add('hidden');
         if (loadingIndicator) loadingIndicator.classList.remove('hidden');
     } else {
         if (dataContainer) dataContainer.classList.remove('hidden');
@@ -140,6 +144,7 @@ async function getMyDeveloper({ silent = false } = {}) {
         if (!silent) {
             if (dataContainer) dataContainer.classList.add('hidden');
             if (emptyContainer) emptyContainer.classList.remove('hidden');
+            if (nftContainer) nftContainer.classList.remove('hidden');
         } else {
             if (dataContainer) dataContainer.classList.remove('hidden');
             if (emptyContainer) emptyContainer.classList.add('hidden');
@@ -268,6 +273,7 @@ async function answerDeveloper() {
     if (scoreBtn) {
         scoreBtn.disabled = true;
     }
+    console.error('sealed :', sealedOnly);
     try {
         await checkGenlayer();
         const txHash = await client.writeContract({
@@ -293,6 +299,7 @@ async function answerDeveloper() {
 function renderQuizData(game) {
     const dataContainer = document.getElementById('gameContainer');
     const emptyContainer = document.getElementById('emptyContainer');
+    const nftContainer = document.getElementById('nftWrapper');
     const stateContainer = document.getElementById('stateContainer');
     const resultContainer = document.getElementById('resultContainer');
   
@@ -308,12 +315,14 @@ function renderQuizData(game) {
     const isActiveState = !isFinished && (st === 'waiting' || st === 'quiz');
   
     if (isActiveState) {
+        if (nftContainer) nftContainer.classList.add('hidden');
         if (!window.quizPollInterval) {
             window.quizPollInterval = setInterval(() => {
                 getMyDeveloper({ silent: true });
             }, 1000);
         }
     } else {
+        if (nftContainer) nftContainer.classList.remove('hidden');
         if (window.quizPollInterval) {
             clearInterval(window.quizPollInterval);
             window.quizPollInterval = null;
@@ -493,6 +502,7 @@ function updateQuizQuestionTimer(qState) {
 function renderQuizEmpty(error) {
     const dataContainer = document.getElementById('gameContainer');
     const emptyContainer = document.getElementById('emptyContainer');
+    const nftContainer = document.getElementById('nftWrapper');
     const languageSelect = document.getElementById('languageSelect');
     const createBtn = document.getElementById('createBtn');
     const startBtn = document.getElementById('startBtn');
@@ -500,6 +510,7 @@ function renderQuizEmpty(error) {
     if (saveProgress) saveProgress.classList.add('hidden');
     if (dataContainer) dataContainer.classList.add('hidden');
     if (emptyContainer) emptyContainer.classList.remove('hidden');
+    if (nftContainer) nftContainer.classList.remove('hidden');
     if (error === 'Game not started') {
         if (languageSelect) languageSelect.classList.add('hidden');
         if (createBtn) createBtn.classList.add('hidden');

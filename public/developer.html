@@ -73,6 +73,14 @@
       #nftContainer {
         margin-bottom: 1.5rem;
       }
+      #gameContainer {
+        border-top: 1px solid #e0e0e0;
+        padding-top: 16px;
+      }
+      #emptyContainer {
+        border-top: 1px solid #e0e0e0;
+        padding-top: 16px;
+      }
       .nft-grid {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -128,7 +136,7 @@
         <div class="spinner"></div>
         <p>Loading...</p>
       </div>
-      <div id="gameContainer" class="hidden">
+      <div id="nftWrapper" class="hidden">
         <div id="nftContainer">
           <div class="nft-grid">
             <div class="nft-card">
@@ -163,9 +171,11 @@
             <button id="mintBtn" class="btn" disabled>Mint NFT (0.0001 ETH)</button>
             <div id="mintProgress" class="spinner2 hidden" aria-label="Loading"></div>
             <div id="mintState" class="mintState">You have not whitelisted yet</div>
+          </div>
+          <p id="mintStat"></p>
         </div>
-        <p id="mintStat"></p>
-        </div>
+      </div>
+      <div id="gameContainer" class="hidden">
         <div id="stateContainer" class="hidden">
         </div>
         <div id="resultContainer" class="hidden">

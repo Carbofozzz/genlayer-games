@@ -179,7 +179,7 @@ class DeveloperQuiz(gl.Contract):
             raise Exception("You have already started this game")
         if game_cache is not None and len(game_cache.game_questions) == 0:
             raise Exception("You have no questions this game")
-        game_cache.game_start_time = _convert_time(gl.message_raw["datetime"], 15)
+        game_cache.game_start_time = _convert_time(gl.message_raw["datetime"], 30)
         game_cache.game_duration = str(_calculate_game_duration(game_cache.game_questions))
         time_result = 0
         for q_id, q in game_cache.game_questions.items():
@@ -222,6 +222,20 @@ class DeveloperQuiz(gl.Contract):
             game_cache.game_score = score_item
             game_cache.game_scored = True
             # bridge
+            message = json.dumps({ "address": sender_address.as_hex, "rarity": "1" })
+            if score_item.score_value > 2600:
+                message = json.dumps({ "address": sender_address.as_hex, "rarity": "2" })
+            if score_item.score_value > 3500:
+                message = json.dumps({ "address": sender_address.as_hex, "rarity": "3" })
+            if score_item.score_value > 4200:
+                message = json.dumps({ "address": sender_address.as_hex, "rarity": "4" })
+            if score_item.score_value > 4700:
+                message = json.dumps({ "address": sender_address.as_hex, "rarity": "5" })
+            abi = [str]
+            encoder = genvm_eth.MethodEncoder("", abi, bool)
+            message_bytes = encoder.encode_call([message])[4:]
+            bridge_contract = gl.get_contract_at(self.bridge_sender)
+            bridge_contract.emit().send_message(self.target_chain_eid, self.target_contract, message_bytes)
             self.error = str(score)
         except Exception as e:
             self.error = str(e)
@@ -451,7 +465,7 @@ def _parse_questions(questions: TreeMap[str, Question], admin: bool) -> dict:
     return result
 
 def _check_time_active(game: Game, start_time: str) -> bool:
-    return game.game_started == True and float(_convert_time(start_time, 0)) - float(game.game_start_time) < float(game.game_duration) + 180
+    return game.game_started == True and float(_convert_time(start_time, 0)) - float(game.game_start_time) < float(game.game_duration)
 
 def _check_time_scoring(game: Game, start_time: str) -> bool:
     score_time = float(_convert_time(start_time, 0)) - float(game.game_start_time) - float(game.game_duration) > 0 
