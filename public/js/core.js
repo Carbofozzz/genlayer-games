@@ -19,7 +19,7 @@ let contractMochi = '0x8C06eD92CcDc05a23Ec2cEb6196f310717872878';
 let contractMochiQuest = '0xe0E74E58deD82caA331B5cF0B46E62A663767d5A';
 let contractQuestions = '0xB30Ff003081124CEf7947D41785EAD3BdbEda543';
 let evmContractQuestions = '0xD695d6Cdd5Fb389469Bd1Ee240a82778FAC4Fd5A';
-let contractDeveloper = '0x78762e4C09c06379988d704dee8af68F0D53D982';
+let contractDeveloper = '0xBF93212155fFDA043E629E9bF55F2dC5afc686DA';
 let evmContractDeveloper = '0xdD3BC70cBa7700dC51718a2773ce317d25F0Bbef';
 
 const BASE_SEPOLIA_RPC = "https://sepolia.base.org";

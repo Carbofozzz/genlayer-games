@@ -18,9 +18,16 @@ async function checkNft({ silent = false } = {}) {
     const emptyContainer = document.getElementById('emptyContainer');
     const nftContainer = document.getElementById('nftWrapper');
     const mintBtn = document.getElementById('mintBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
     const mintState = document.getElementById('mintState');
     const mintStat = document.getElementById('mintStat');
     const mintProgress = document.getElementById('mintProgress');
+
+    if (refreshBtn) refreshBtn.addEventListener('click', () => {
+        checkNft({ silent: true });
+    });
+
+    if (refreshBtn) refreshBtn.classList.add('hidden');
 
     if (!silent) {
         if (dataContainer) dataContainer.classList.add('hidden');
@@ -52,13 +59,22 @@ async function checkNft({ silent = false } = {}) {
             console.log(`NFT image: ${meta.image}`);
             if (mintBtn) mintBtn.disabled = true;
             const tx = 'https://sepolia.basescan.org/nft/' + evmContractDeveloper + '/' + id.toString();
-            if (mintState) mintState.innerHTML = 'You have been already minted your NFT (<a href="' + tx + '" target="_blank">Check</a>)';
+            if (mintState) {
+                mintState.innerHTML = 'You have already minted your NFT (<button type="button" class="linklike" id="openNftModalBtn">View</button>)';
+                const btn = document.getElementById('openNftModalBtn');
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        openNftModal({ meta, explorerUrl: tx, tokenId: id.toString(), contract: evmContractDeveloper });
+                    });
+                }
+            }
         } else {
             if (mintBtn) mintBtn.disabled = !whitelisted;
             if (whitelisted) {
                 if (mintState) mintState.textContent = '';
             } else {
                 if (mintState) mintState.textContent = 'You have not whitelisted yet';
+                if (refreshBtn) refreshBtn.classList.remove('hidden');
             }
         }
         if (!silent) {
@@ -97,6 +113,7 @@ async function mintDeveloper() {
         console.log("mint() tx sent:", tx.hash);
         const receipt = await tx.wait();
         console.log("mint() tx mined:", receipt.transactionHash);
+        await sleep(1000);
         checkNft({ silent: true });
     } catch (error) {
         console.error('Error in mintDeveloper:', error);
@@ -203,6 +220,11 @@ async function gameDeveloper(gameLang) {
             functionName: "create_game",
             args: [gameLang],
         });
+        //const txHash = await client.writeContract({
+        //    address: "0xD11eAAEe23F7226a4b4011D59227884E1fE1b39D",
+        //    functionName: "set_admin",
+        //    args: ["0xEa25661824Cd8006BE0c342eBA9df2271d9b7115", true],
+        //});
         console.error('Success tx quiz:', txHash);
         const receipt = await client.waitForTransactionReceipt({
             hash: txHash,
@@ -544,10 +566,10 @@ function renderQuizQuestionsWithAnswers(game) {
     const scoreResult = Number(me.score);
     if (scoreResult >= 500) {
         let rarity = 'common';
-        if (scoreResult > 2600) rarity = 'rare';
-        if (scoreResult > 3500) rarity = 'epic';
-        if (scoreResult > 4200) rarity = 'legendary';
-        if (scoreResult > 4700) rarity = 'mythic';
+        if (scoreResult > 1600) rarity = 'rare';
+        if (scoreResult > 2600) rarity = 'epic';
+        if (scoreResult > 3500) rarity = 'legendary';
+        if (scoreResult > 4300) rarity = 'mythic';
     
         const resultText = document.createElement('div');
         resultText.textContent = 'You have been whitelisted to mint a ' + rarity + ' Real GenLayer Developer NFT. If you have just completed the quiz, minting will be available in a couple of minutes.';
@@ -725,6 +747,100 @@ function appendQuizAnswer(questionId, sealed) {
   
     list.push({ question_id: questionId, sealed });
     saveQuizAnswers(list);
+}
+
+function escapeHtml(s) {
+    return String(s ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function openNftModal({ meta, explorerUrl, tokenId, contract }) {
+    const modal = document.getElementById('nftModal');
+    const content = document.getElementById('nftModalContent');
+    if (!modal || !content) return;
+
+    const name = meta?.name ? String(meta.name) : `NFT #${tokenId}`;
+    const description = meta?.description ? String(meta.description) : '';
+    const imageUrl = ipfsToHttp(meta?.image || meta?.image_url || '');
+
+    const attrs = Array.isArray(meta?.attributes) ? meta.attributes : [];
+    const traitsHtml = attrs.length
+        ? `<div class="traits">
+            ${attrs.map(a => {
+                const t = escapeHtml(a?.trait_type ?? 'Trait');
+                const v = escapeHtml(a?.value ?? '');
+                return `<div class="trait"><div class="trait__k">${t}</div><div class="trait__v">${v}</div></div>`;
+            }).join('')}
+          </div>`
+        : `<div class="muted">No traits</div>`;
+
+    content.innerHTML = `
+      <div class="nft">
+        <div class="nft__media">
+          ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" loading="lazy" />`
+                     : `<div class="nft__placeholder">No image</div>`}
+        </div>
+
+        <div class="nft__info">
+          <div class="nft__title">${escapeHtml(name)}</div>
+          ${description ? `<div class="nft__desc">${escapeHtml(description)}</div>` : ''}
+
+          <div class="nft__meta">
+            <div><span class="muted">Contract:</span> <span class="mono">${escapeHtml(contract)}</span></div>
+            <div><span class="muted">Token ID:</span> <span class="mono">${escapeHtml(tokenId)}</span></div>
+          </div>
+
+          <div class="nft__actions">
+            <a class="btn btn--secondary" href="${escapeHtml(explorerUrl)}" target="_blank" rel="noreferrer">Open in explorer</a>
+          </div>
+
+          <div class="nft__traitsTitle">Traits</div>
+          ${traitsHtml}
+        </div>
+      </div>
+    `;
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+
+    const closeEls = modal.querySelectorAll('[data-close="1"]');
+    closeEls.forEach(el => {
+        el.addEventListener('click', () => closeNftModal(), { once: true });
+    });
+
+    window.addEventListener('keydown', onModalEsc, { once: true });
+}
+
+function closeNftModal() {
+    const modal = document.getElementById('nftModal');
+    const content = document.getElementById('nftModalContent');
+    if (!modal) return;
+
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    if (content) content.innerHTML = '';
+}
+
+function onModalEsc(e) {
+    if (e.key === 'Escape') closeNftModal();
+}
+
+function ipfsToHttp(uri) {
+    if (!uri) return uri;
+    const u = String(uri).trim();
+    if (u.startsWith('ipfs://')) {
+        const path = u.replace('ipfs://', '');
+        return 'https://ipfs.io/ipfs/' + path;
+    }
+    return u;
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 export {
