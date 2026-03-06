@@ -58,7 +58,7 @@ async function checkNft({ silent = false } = {}) {
             const meta = JSON.parse(response);
             console.log(`NFT image: ${meta.image}`);
             if (mintBtn) mintBtn.disabled = true;
-            const tx = 'https://sepolia.basescan.org/nft/' + evmContractDeveloper + '/' + id.toString();
+            const tx = 'https://basescan.org/nft/' + evmContractDeveloper + '/' + id.toString();
             if (mintState) {
                 mintState.innerHTML = 'You have already minted your NFT (<button type="button" class="linklike" id="openNftModalBtn">View</button>)';
                 const btn = document.getElementById('openNftModalBtn');
