@@ -8,16 +8,38 @@
     <title>Leaderboard</title>
     <style>
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
-      .wrap { max-width: 800px; margin: 0 auto; }
+      .wrap { max-width: 800px; margin: 0 auto;min-width: 0; }
       a { color: #0366d6; text-decoration: none; }
       ul { padding-left: 1.25rem; }
-      .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem;flex-wrap: wrap; }
       .nav a { color: #0366d6; text-decoration: none; }
       .nav a.active { font-weight: 600; }
-      .nav .links { display: flex; gap: .75rem; }
+      .nav .links { display: flex; gap: .75rem; flex-wrap: wrap;}
       .nav .wallet { display: flex; gap: .5rem; align-items: center; }
       .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
-      .lb-tab { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+      .lb-tabs{
+        width: 100%;
+        max-width: 100%;
+        flex-wrap: nowrap;
+        min-width: 0;
+        margin: 1rem 0;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        gap: .75rem;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .lb-tabs::-webkit-scrollbar{
+       display: none;
+      }
+      .lb-tab { 
+        flex: 0 0 auto;
+        white-space: nowrap;
+        border-bottom-left-radius: 0; 
+        border-bottom-right-radius: 0; 
+      }
       .lb-tab-active { background: #e5efff; border-color: #9cb8ff; font-weight: 600; }
     </style>
   </head>
@@ -36,13 +58,14 @@
     </div>
     <div class="wrap">
       <h1>Leaderboard</h1>
-      <div id="lbTabs" style="margin: 1rem 0; border-bottom: 1px solid #e5e7eb; display:flex; gap:.75rem;">
+      <div id="lbTabs" class="lb-tabs">
         <button class="btn lb-tab lb-tab-active" data-tab="overall">Overall</button>
         <button class="btn lb-tab" data-tab="guess">GuessPicture</button>
         <button class="btn lb-tab" data-tab="match">DrawMatch</button>
         <button class="btn lb-tab" data-tab="punch">PunchLine</button>
         <button class="btn lb-tab" data-tab="cook">CookItUp</button>
         <button class="btn lb-tab" data-tab="mochi">Mochi NFT</button>
+        <button class="btn lb-tab" data-tab="developer">Real Developer</button>
       </div>
     
       <div id="leaderboard-overall"></div>
@@ -53,6 +76,7 @@
       <div id="leaderboard-cook" style="display:none;"></div>
       <div id="leaderboard-mochi" style="display:none;"></div>
       <div id="leaderboard-punch" style="display:none;"></div>
+      <div id="leaderboard-developer" style="display:none;"></div>
     </div>
     <script type="module" src="/main.js"></script>
   </body>

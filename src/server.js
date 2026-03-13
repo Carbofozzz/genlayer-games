@@ -9,13 +9,113 @@ import { evmNetwork, baseSepoliaNetwork, baseMainnetNetwork } from './config/net
 import crypto from 'crypto';
 import sharp from 'sharp';
 import fetch from 'node-fetch';
+import session from 'express-session';
+import cookieParser from 'cookie-parser';
+import passport from 'passport';
+import passportDiscord from 'passport-discord';
+const { Strategy: DiscordStrategy } = passportDiscord;
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const TARGET_GUILD_ID = "1237055789441487021";
+
 const app = express();
+
+app.set('trust proxy', 1);app.use(cookieParser());
+app.use(session({
+  secret: process.env.SESSION_SECRET || '',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    httpOnly: true
+  }
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => {
+  done(null, {
+    id: user.id,
+    username: user.username,
+    global_name: user.global_name,
+    discriminator: user.discriminator,
+    avatar: user.avatar,
+    inTargetGuild: !!user.inTargetGuild,
+    guildRoles: user.guildRoles || []
+  });
+});
+
+passport.deserializeUser((obj, done) => done(null, obj));
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function discordApi(path, accessToken, { retries = 4 } = {}) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const resp = await fetch(`https://discord.com/api/v10${path}`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (resp.ok) return resp.json();
+
+    if (resp.status === 404) return null;
+
+    if (resp.status === 429) {
+      let waitMs = 1000;
+      try {
+        const data = await resp.json();
+        if (typeof data?.retry_after === 'number') {
+          waitMs = Math.ceil(data.retry_after * 1000);
+        }
+      } catch (_) {
+        const h = resp.headers.get('x-ratelimit-reset-after');
+        if (h) waitMs = Math.ceil(Number(h) * 1000);
+      }
+
+      if (attempt < retries) {
+        await sleep(waitMs + 100); 
+        continue;
+      }
+    }
+
+    const txt = await resp.text();
+    throw new Error(`Discord API ${path} -> ${resp.status}: ${txt}`);
+  }
+
+  throw new Error(`Discord API ${path} -> retries exceeded`);
+}
+
+passport.use(new DiscordStrategy(
+  {
+    clientID: process.env.DISCORD_CLIENT_ID,
+    clientSecret: process.env.DISCORD_CLIENT_SECRET,
+    callbackURL: process.env.DISCORD_CALLBACK_URL,
+    scope: ['identify', 'guilds.members.read']
+  },
+  async (accessToken, refreshToken, profile, done) => {
+    try {
+      const member = await discordApi(
+        `/users/@me/guilds/${TARGET_GUILD_ID}/member`,
+        accessToken
+      );
+
+      profile.inTargetGuild = !!member;
+      profile.guildRoles = Array.isArray(member?.roles) ? member.roles : [];
+
+      return done(null, profile);
+    } catch (e) {
+      console.error('Discord guild check failed:', e.message);
+      profile.inTargetGuild = false;
+      profile.guildRoles = [];
+      return done(null, profile);
+    }
+  }
+));
 
 const PORT = process.env.PORT || 3000;
 const S3_ENDPOINT = process.env.S3_ENDPOINT || "";
@@ -60,6 +160,79 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+// discord endpoints
+app.get('/auth/discord', (req, res, next) => {
+  const returnTo = req.query.returnTo || req.headers.referer || '/';
+  res.cookie('returnTo', returnTo, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  });
+  next();
+}, passport.authenticate('discord'));
+
+app.get('/auth/discord/callback', (req, res, next) => {
+  passport.authenticate('discord', (err, user, info) => {
+    if (err) {
+      console.error('AUTH ERR:', err);
+      console.error('statusCode:', err?.oauthError?.statusCode);
+      console.error('data:', err?.oauthError?.data?.toString?.() || err?.oauthError?.data);
+      return res.status(500).send('OAuth failed, check server logs');
+    }
+    if (!user) return res.redirect('/?auth=failed');
+    req.logIn(user, (e) => {
+      if (e) return next(e);
+      res.redirect('/community');
+    });
+  })(req, res, next);
+});
+
+app.get('/logout', (req, res, next) => {
+  req.logout(err => {
+    if (err) return next(err);
+    req.session.destroy(() => {
+      res.clearCookie('connect.sid');
+      res.redirect('/community');
+    });
+  });
+});
+
+app.get('/api/me', (req, res) => {
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
+    return res.json({ authenticated: false });
+  }
+
+  const user = req.user;
+  return res.json({
+    authenticated: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      global_name: user.global_name,
+      avatarUrl: getDiscordAvatarUrl(user),
+      inTargetGuild: !!user.inTargetGuild,
+      guildRoles: user.guildRoles || []
+    }
+  });
+});
+
+function getDiscordAvatarUrl(user) {
+  if (!user) return null;
+
+  if (user.avatar) {
+    const ext = user.avatar.startsWith('a_') ? 'gif' : 'png';
+    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${ext}?size=128`;
+  }
+
+  let index = 0;
+  if (user.discriminator && user.discriminator !== '0') {
+    index = Number(user.discriminator) % 5;
+  } else {
+    index = Number((BigInt(user.id) >> 22n) % 6n);
+  }
+  return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
+}
 
 // Public endpoint to expose EVM network config
 app.get('/api/config/network', (_req, res) => {
@@ -507,6 +680,10 @@ app.get('/questions', (_req, res) => {
 
 app.get('/developer', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/developer.html'));
+});
+
+app.get('/community', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/community.html'));
 });
 
 app.get('/quiz/:id', async (req, res) => {

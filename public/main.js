@@ -24,6 +24,7 @@ import {
   import { setNickname } from './js/leaderboard.js';
   import { checkPageImpl } from './js/pages.js';
   import { mintMochi, burnMochi, activateMochi, answerMochi } from './js/mochi.js';
+  import { auth, logout } from './js/community.js';
   
   setCheckPageImpl(checkPageImpl);
   
@@ -68,7 +69,9 @@ import {
     answerDeveloper,
     gameDeveloper,
     startDeveloper,
-    mintDeveloper
+    mintDeveloper,
+    auth,
+    logout
   };
   
   if (typeof window !== 'undefined') {

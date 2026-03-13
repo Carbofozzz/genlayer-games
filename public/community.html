@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_black-BvQhofdN.svg" media="(prefers-color-scheme: light)"/>
+    <link rel="shortcut icon" type="image/svg+xml" href="/img/mark_white-DC3VjLtV.svg" media="(prefers-color-scheme: dark)"/>
+    <title>GenLayer Community - a service for creating community panels for the GenLayer community</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji'; margin: 0; padding: 2rem; }
+      .wrap { max-width: 800px; margin: 0 auto; }
+      h1 { margin: 0 0 1rem; }
+      code { background: #f2f2f2; padding: .2rem .4rem; border-radius: 4px; }
+      .nav { max-width: 800px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .nav a { color: #0366d6; text-decoration: none; }
+      .nav a.active { font-weight: 600; }
+      .punch a { color: #0366d6; text-decoration: none; }
+      .nav .links { display: flex; gap: .75rem; }
+      .nav .wallet { display: flex; gap: .5rem; align-items: center; }
+      .btn { padding: .4rem .7rem; border: 1px solid #ccc; border-radius: 6px; background: #f8f8f8; cursor: pointer; }
+      .theme { margin-top: 1rem; }
+      .theme textarea { width: 100%; height: 200px; padding: .6rem; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; }
+      .theme .row {
+        display: flex;
+        gap: .5rem;
+        justify-content: flex-start;
+        padding-top: .5rem;
+      }
+      .hidden { display: none !important; }
+      .theme .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid #ddd;
+        border-top-color: #0366d6;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body data-page-name="start_community">
+    <div class="nav">
+      <div class="links">
+        <a href="/">New Game</a>
+        <a href="/mochi">Mochi NFT</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/rules">Rules</a>
+      </div>
+      <div class="wallet">
+        <a href="/me"><span id="addr" style="opacity:.8"></span></a>
+        <button id="connectBtn" class="btn">Connect wallet</button>
+      </div>
+    </div>
+    <div class="wrap">
+      <h1>GenLayer Community</h1>
+      <p>Add your avatar to the community panel.</p>
+      <div class="theme" style="margin-top:1rem; gap:.5rem;">
+        <div id="panno" class="hidden">  </div>
+        <div class="row">
+            <button id="discordBtn" class="btn hidden">Sign in with Discord</button>
+            <button id="logoutBtn" class="btn hidden">Logout</button>
+            <div id="saveProgress" class="spinner hidden" aria-label="Loading"></div>
+        </div>
+        <p id="guild_note"></p>
+      </div>
+    </div>
+    <script type="module" src="/main.js"></script>
+    <script>
+      const submitBtn = document.getElementById('discordBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (submitBtn) submitBtn.addEventListener('click', async () => {
+        try {
+          WalletUI.auth();
+        } catch(e) { alert(e.message); }
+      });
+      if (logoutBtn) logoutBtn.addEventListener('click', async () => {
+        try {
+          WalletUI.logout();
+        } catch(e) { alert(e.message); }
+      });
+    </script>
+  </body>
+</html>

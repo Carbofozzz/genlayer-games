@@ -3,6 +3,7 @@ import {
     TransactionStatus,
     contractStat,
     contractMochi,
+    contractDeveloper,
     checkGenlayer,
     getStat,
     maskAddress
@@ -19,7 +20,7 @@ import {
       tab.addEventListener('click', () => {
         const name = tab.dataset.tab;
         tabs.forEach(t => t.classList.toggle('lb-tab-active', t === tab));
-        ['overall', 'guess', 'match', 'quiz', 'punch', 'cook', 'mochi'].forEach(key => {
+        ['overall', 'guess', 'match', 'quiz', 'punch', 'cook', 'mochi', 'developer'].forEach(key => {
           const el = document.getElementById('leaderboard-' + key);
           if (el) el.style.display = key === name ? '' : 'none';
         });
@@ -36,6 +37,8 @@ import {
           getLeaderboardCook();
         } else if (name === 'mochi') {
           getLeaderboardMochi();
+        } else if (name === 'developer') {
+          getLeaderboardDeveloper();
         }
       });
     });
@@ -191,6 +194,27 @@ import {
     }
   }
 
+  async function getLeaderboardDeveloper() {
+    if (!client) return;
+    try {
+      const rating = await client.readContract({
+        address: contractDeveloper,
+        functionName: 'get_rating',
+        args: [500],
+      });
+      let res = JSON.parse(rating);
+      console.error('Success getting leaderboard developer: ', res);
+      const sorted = [...res].sort((a, b) => {
+        const pointsA = Number(a.stat.score) || 0;
+        const pointsB = Number(b.stat.score) || 0;
+        return pointsB - pointsA;
+      });
+      renderLeaderboard('leaderboard-developer', sorted);
+    } catch (error) {
+      console.error('Error getting leaderboard developer:', error);
+    }
+  }
+
   async function getLeaderboardMatch() {
     if (!client) return;
     try {
@@ -297,6 +321,8 @@ import {
       const pointsEl = document.createElement('div');
       if (rootId === "leaderboard-mochi") {
         pointsEl.textContent = String(item.level ?? 0);
+      } else if (rootId === "leaderboard-developer") {
+        pointsEl.textContent = String(item.stat.score ?? 0);
       } else {
         pointsEl.textContent = String(item.points ?? 0);
       }
