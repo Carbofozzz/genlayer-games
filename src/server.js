@@ -13,12 +13,14 @@ import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import passportDiscord from 'passport-discord';
+import fs from 'fs/promises';
 const { Strategy: DiscordStrategy } = passportDiscord;
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const PUBLIC_DIR = path.join(__dirname, '../public');
 
 const TARGET_GUILD_ID = "1237055789441487021";
 
@@ -107,6 +109,12 @@ passport.use(new DiscordStrategy(
       profile.inTargetGuild = !!member;
       profile.guildRoles = Array.isArray(member?.roles) ? member.roles : [];
 
+      if (profile.inTargetGuild) {
+        syncDiscordAvatarAndPanorama(profile).catch(e => {
+          console.error('Avatar/panorama sync failed:', e.message);
+        });
+      }
+
       return done(null, profile);
     } catch (e) {
       console.error('Discord guild check failed:', e.message);
@@ -123,6 +131,30 @@ const S3_BUCKET = process.env.S3_BUCKET || "";
 const S3_KEY = process.env.S3_KEY || "";
 const S3_SECRET = process.env.S3_SECRET || "";
 const QUIZ_KEY_RAW = process.env.QUIZ_KEY || "";
+const AVA_PREFIX = process.env.AVA_PREFIX || 'community';
+const AVA_MAX_USERS = 474; 
+const PANO_CENTER_IMAGE_KEYS = {
+  64: process.env.PANO_CENTER_IMAGE_KEY_64 || 'img/panno-center-64.png',
+  48: process.env.PANO_CENTER_IMAGE_KEY_48 || 'img/panno-center-48.png',
+  32: process.env.PANO_CENTER_IMAGE_KEY_32 || 'img/panno-center-32.png',
+};
+const PANO_PLACEHOLDER_KEYS = {
+  64: (process.env.PANO_PLACEHOLDER_KEYS_64 || 'img/frame-1-64.png,img/frame-2-64.png,img/frame-3-64.png,img/frame-4-64.png,img/frame-5-64.png,img/frame-6-64.png')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, 6),
+  48: (process.env.PANO_PLACEHOLDER_KEYS_48 || 'img/frame-1-48.png,img/frame-2-48.png,img/frame-3-48.png,img/frame-4-48.png,img/frame-5-48.png,img/frame-6-48.png')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, 6),
+  32: (process.env.PANO_PLACEHOLDER_KEYS_32 || 'img/frame-1-32.png,img/frame-2-32.png,img/frame-3-32.png,img/frame-4-32.png,img/frame-5-32.png,img/frame-6-32.png')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, 6),
+};
 
 const QUIZ_KEY = QUIZ_KEY_RAW ? crypto.createHash('sha256').update(QUIZ_KEY_RAW, 'utf8').digest() : null;
 
@@ -198,6 +230,20 @@ app.get('/logout', (req, res, next) => {
   });
 });
 
+function resolvePublicAssetPath(relPath) {
+  const safeRel = String(relPath || '').replace(/^\/+/, '');
+  const abs = path.resolve(PUBLIC_DIR, safeRel);
+  if (!abs.startsWith(PUBLIC_DIR + path.sep) && abs !== PUBLIC_DIR) {
+    throw new Error(`Invalid local asset path: ${relPath}`);
+  }
+  return abs;
+}
+
+async function localGetBuffer(relPath) {
+  const abs = resolvePublicAssetPath(relPath);
+  return fs.readFile(abs);
+}
+
 app.get('/api/me', (req, res) => {
   if (!req.isAuthenticated || !req.isAuthenticated()) {
     return res.json({ authenticated: false });
@@ -222,7 +268,7 @@ function getDiscordAvatarUrl(user) {
 
   if (user.avatar) {
     const ext = user.avatar.startsWith('a_') ? 'gif' : 'png';
-    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${ext}?size=128`;
+    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${ext}?size=512`;
   }
 
   let index = 0;
@@ -234,7 +280,377 @@ function getDiscordAvatarUrl(user) {
   return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
 }
 
-// Public endpoint to expose EVM network config
+async function syncDiscordAvatarAndPanorama(profile) {
+  const saved = await saveDiscordAvatarVariants(profile);
+  if (saved.added) {
+    await requestPanoramaBuild();
+  }
+}
+
+function sanitizeNick(nick) {
+  return (nick || 'unknown')
+    .toString()
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, '_')
+    .slice(0, 64) || 'unknown';
+}
+
+function getDisplayNick(profile) {
+  return profile.username || `user_${profile.id}`;
+}
+
+let panoBuildPromise = null;
+let panoBuildQueued = false;
+
+async function requestPanoramaBuild() {
+  if (panoBuildPromise) {
+    panoBuildQueued = true;
+    return panoBuildPromise;
+  }
+
+  panoBuildPromise = (async () => {
+    do {
+      panoBuildQueued = false;
+      await buildAndUploadPanorama();
+    } while (panoBuildQueued);
+  })().finally(() => {
+    panoBuildPromise = null;
+  });
+
+  return panoBuildPromise;
+}
+
+async function s3GetBuffer(Key) {
+  const obj = await s3.getObject({ Bucket: S3_BUCKET, Key }).promise();
+  return Buffer.isBuffer(obj.Body) ? obj.Body : Buffer.from(obj.Body);
+}
+
+async function s3PutBuffer(Key, Body, ContentType = 'image/jpeg') {
+  return s3.upload({
+    Bucket: S3_BUCKET,
+    Key,
+    Body,
+    ContentType,
+    ACL: 'public-read'
+  }).promise();
+}
+
+function pickCellByGrid(grid) {
+  if (grid < 30) return 64;
+  if (grid < 50) return 48;
+  return 32;
+}
+
+function getPanoramaLayout(usersCount) {
+  const MIN_GRID = 10;
+  const MAX_GRID = 70;
+  const STEP = 2;
+  const CENTER_CUT = 16;
+
+  const maxCapacity = MAX_GRID * MAX_GRID - CENTER_CUT;
+  const need = Math.max(1, Math.min(usersCount, maxCapacity));
+
+  let grid = MIN_GRID;
+  for (; grid <= MAX_GRID; grid += STEP) {
+    const capacity = grid * grid - CENTER_CUT;
+    if (capacity >= need) break;
+  }
+  if (grid > MAX_GRID) grid = MAX_GRID;
+
+  const cell = pickCellByGrid(grid);
+  return { grid, cell };
+}
+
+function getUsableSlots(grid) {
+  const centerStart = grid / 2 - 2;
+  const slots = [];
+  for (let y = 0; y < grid; y++) {
+    for (let x = 0; x < grid; x++) {
+      const inCenter = x >= centerStart && x < centerStart + 4 && y >= centerStart && y < centerStart + 4;
+      if (!inCenter) slots.push({ x, y });
+    }
+  }
+  return slots;
+}
+
+function pickUniformIndices(totalSlots, count) {
+  if (count <= 0) return [];
+  if (count >= totalSlots) return Array.from({ length: totalSlots }, (_, i) => i);
+  if (count === 1) return [Math.floor((totalSlots - 1) / 2)];
+
+  const taken = new Set();
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    let idx = Math.round((i * (totalSlots - 1)) / (count - 1));
+    while (taken.has(idx) && idx < totalSlots - 1) idx++;
+    while (taken.has(idx) && idx > 0) idx--;
+    if (!taken.has(idx)) {
+      taken.add(idx);
+      out.push(idx);
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
+
+function getRingOrderIndices(slots, widthCells, heightCells) {
+  const cx = (widthCells - 1) / 2;
+  const cy = (heightCells - 1) / 2;
+
+  return slots
+    .map((s, idx) => {
+      const dx = s.x - cx;
+      const dy = s.y - cy;
+
+      const ring = Math.max(Math.abs(dx), Math.abs(dy));
+
+      let angle = Math.atan2(dy, dx); 
+      angle = (angle + Math.PI * 2) % (Math.PI * 2); 
+
+      return { idx, ring, angle };
+    })
+    .sort((a, b) => {
+      if (a.ring !== b.ring) return a.ring - b.ring;
+      return a.angle - b.angle;
+    })
+    .map(v => v.idx);
+}
+
+async function listAllObjects(prefix) {
+  let token;
+  const all = [];
+  do {
+    const page = await s3.listObjectsV2({
+      Bucket: S3_BUCKET,
+      Prefix: prefix,
+      ContinuationToken: token
+    }).promise();
+    if (page.Contents?.length) all.push(...page.Contents);
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return all;
+}
+
+async function collectCurrentUserAvatarKeysBySize(size) {
+  const prefix = `${AVA_PREFIX}/users/`;
+  const items = await listAllObjects(prefix);
+  const suffix = `/avatar_${size}.jpg`;
+  const keys = items
+    .filter(o => o.Key.endsWith(suffix))
+    .sort((a, b) => new Date(b.LastModified) - new Date(a.LastModified))
+    .map(o => o.Key);
+
+  return keys.slice(0, AVA_MAX_USERS);
+}
+
+async function fetchDiscordAvatarBuffer(profile) {
+  const avatarUrl = getDiscordAvatarUrl(profile); 
+  if (!avatarUrl) return null;
+  const resp = await fetch(avatarUrl);
+  if (!resp.ok) throw new Error(`avatar fetch failed: ${resp.status}`);
+  return Buffer.from(await resp.arrayBuffer());
+}
+
+async function saveDiscordAvatarVariants(profile) {
+  const nick = sanitizeNick(getDisplayNick(profile));
+  const avatarHash = profile.avatar || 'default';
+  const userId = profile.id;
+
+  const metaKey = `${AVA_PREFIX}/users/${userId}/meta.json`;
+  let prevHash = null;
+  try {
+    const metaRaw = await s3GetBuffer(metaKey);
+    const meta = JSON.parse(metaRaw.toString('utf8'));
+    prevHash = meta?.avatarHash || null;
+  } catch (_) {}
+
+  if (prevHash === avatarHash) return { added: false };
+
+  const src = await fetchDiscordAvatarBuffer(profile);
+  if (!src) return { added: false };
+
+  const v64 = await sharp(src).resize(64, 64, { fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+  const v48 = await sharp(src).resize(48, 48, { fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+  const v32 = await sharp(src).resize(32, 32, { fit: 'cover' }).jpeg({ quality: 90 }).toBuffer();
+
+  const byNickBase = `${AVA_PREFIX}/avatars/${nick}/${userId}_${avatarHash}`;
+  await Promise.all([
+    s3PutBuffer(`${byNickBase}_64.jpg`, v64, 'image/jpeg'),
+    s3PutBuffer(`${byNickBase}_48.jpg`, v48, 'image/jpeg'),
+    s3PutBuffer(`${byNickBase}_32.jpg`, v32, 'image/jpeg'),
+  ]);
+
+  await Promise.all([
+    s3PutBuffer(`${AVA_PREFIX}/users/${userId}/avatar_64.jpg`, v64, 'image/jpeg'),
+    s3PutBuffer(`${AVA_PREFIX}/users/${userId}/avatar_48.jpg`, v48, 'image/jpeg'),
+    s3PutBuffer(`${AVA_PREFIX}/users/${userId}/avatar_32.jpg`, v32, 'image/jpeg'),
+    s3.upload({
+      Bucket: S3_BUCKET,
+      Key: metaKey,
+      Body: Buffer.from(JSON.stringify({
+        userId,
+        nick,
+        avatarHash,
+        updatedAt: Date.now()
+      }), 'utf8'),
+      ContentType: 'application/json',
+      ACL: 'public-read'
+    }).promise()
+  ]);
+
+  return { added: true };
+}
+
+async function buildAndUploadPanorama() {
+  const countKeys = await collectCurrentUserAvatarKeysBySize(64);
+  const usersCount = Math.min(countKeys.length, AVA_MAX_USERS);
+
+  const { grid, cell } = getPanoramaLayout(Math.max(usersCount, 1));
+  const size = grid * cell;
+  const centerSize = 4 * cell;
+
+  const avatarKeys = await collectCurrentUserAvatarKeysBySize(cell);
+  const avatarLimited = avatarKeys.slice(0, AVA_MAX_USERS);
+
+  const slots = getUsableSlots(grid);
+  const totalSlots = slots.length;
+
+  const avatarCount = Math.min(avatarLimited.length, totalSlots);
+  const avatarKeysForPano = avatarLimited.slice(0, avatarCount);
+
+  const placeholderKeys = (PANO_PLACEHOLDER_KEYS[cell] || []).slice(0, 6);
+
+  const ringOrder = getRingOrderIndices(slots, grid, grid);
+
+  const avatarPositionsInOrder = pickUniformIndices(totalSlots, avatarCount);
+  const avatarPosSet = new Set(avatarPositionsInOrder);
+
+  const placement = new Array(totalSlots).fill(null);
+  let avatarPtr = 0;
+  let placeholderPtr = 0;
+
+  for (let pos = 0; pos < totalSlots; pos++) {
+    const slotIdx = ringOrder[pos];
+
+    if (avatarPosSet.has(pos)) {
+      placement[slotIdx] = { source: 's3', key: avatarKeysForPano[avatarPtr++] };
+    } else if (placeholderKeys.length > 0) {
+      placement[slotIdx] = {
+        source: 'local',
+        key: placeholderKeys[placeholderPtr % placeholderKeys.length]
+      };
+      placeholderPtr++;
+    } else {
+      placement[slotIdx] = null;
+    }
+  }
+
+  const composites = [];
+  for (let slotIdx = 0; slotIdx < totalSlots; slotIdx++) {
+    const item = placement[slotIdx];
+    if (!item) continue;
+
+    try {
+      let buf = item.source === 'local'
+        ? await localGetBuffer(item.key)
+        : await s3GetBuffer(item.key);
+
+      buf = await sharp(buf)
+        .resize(cell, cell, { fit: 'cover' })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+
+      const slot = slots[slotIdx];
+      composites.push({
+        input: buf,
+        left: slot.x * cell,
+        top: slot.y * cell
+      });
+    } catch (e) {
+      console.error('Panorama item skip:', item.key, e.message);
+    }
+  }
+
+  try {
+    const centerKey = PANO_CENTER_IMAGE_KEYS[cell];
+    if (centerKey) {
+      const centerBuf = await localGetBuffer(centerKey);
+      const centerResized = await sharp(centerBuf)
+        .resize(centerSize, centerSize, { fit: 'cover' })
+        .png()
+        .toBuffer();
+
+      const c = grid / 2 - 2;
+      composites.push({ input: centerResized, left: c * cell, top: c * cell });
+    }
+  } catch (e) {
+    console.error('Center image load failed:', e.message);
+  }
+
+  const pano = await sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: '#0a0a0a'
+    }
+  })
+    .composite(composites)
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  const versionedKey = `${AVA_PREFIX}/panorama/panorama_${grid}x${grid}_${cell}.jpg`;
+  const latestKey = `${AVA_PREFIX}/panorama/latest.jpg`;
+
+  const [versionedRes, latestRes] = await Promise.all([
+    s3PutBuffer(versionedKey, pano, 'image/jpeg'),
+    s3PutBuffer(latestKey, pano, 'image/jpeg'),
+  ]);
+
+  await s3.upload({
+    Bucket: S3_BUCKET,
+    Key: `${AVA_PREFIX}/panorama/latest.json`,
+    Body: Buffer.from(JSON.stringify({
+      key: latestKey,
+      url: latestRes.Location,
+      versionedKey,
+      versionedUrl: versionedRes.Location,
+      grid,
+      cell,
+      usersCount,
+      updatedAt: Date.now()
+    }), 'utf8'),
+    ContentType: 'application/json',
+    ACL: 'public-read',
+    CacheControl: 'no-cache'
+  }).promise();
+}
+
+async function getPanoramaMetaSafe() {
+  try {
+    const raw = await s3GetBuffer(`${AVA_PREFIX}/panorama/latest.json`);
+    return JSON.parse(raw.toString('utf8'));
+  } catch (_) {
+    return null;
+  }
+}
+
+app.get('/api/community/panorama', async (_req, res) => {
+  try {
+    const meta = await getPanoramaMetaSafe();
+    const processedKeys = await collectCurrentUserAvatarKeysBySize(64);
+
+    return res.json({
+      panorama: meta, // тут уже будут url и versionedUrl
+      processedAvatars: processedKeys.length,
+      maxUsers: AVA_MAX_USERS
+    });
+  } catch (e) {
+    console.error('Panorama API failed:', e);
+    return res.status(500).json({ error: 'Failed to load panorama data' });
+  }
+});
+
 app.get('/api/config/network', (_req, res) => {
   return res.json(evmNetwork);
 });

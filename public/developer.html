@@ -115,151 +115,151 @@
         font-weight: 600;
       }
       .linklike{
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: #2563eb;
-  text-decoration: underline;
-  cursor: pointer;
-  font: inherit;
-}
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: #2563eb;
+        text-decoration: underline;
+        cursor: pointer;
+        font: inherit;
+      }
 
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-}
+      .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+      }
 
-.modal__backdrop{
-  position: absolute;
-  inset: 0;
-  background: rgba(17,24,39,.55);
-  backdrop-filter: blur(3px);
-}
+      .modal__backdrop{
+        position: absolute;
+        inset: 0;
+        background: rgba(17,24,39,.55);
+        backdrop-filter: blur(3px);
+      }
 
-.modal__dialog{
-  position: relative;
-  z-index: 1;
-  width: min(920px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
-  overflow: auto;
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.25);
-  border: 1px solid #e5e7eb;
-}
+      .modal__dialog{
+        position: relative;
+        z-index: 1;
+        width: min(920px, calc(100vw - 32px));
+        max-height: calc(100vh - 32px);
+        overflow: auto;
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.25);
+        border: 1px solid #e5e7eb;
+      }
 
-.modal__close{
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  cursor: pointer;
-  font-size: 20px;
-  line-height: 34px;
-}
+      .modal__close{
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+        background: #fff;
+        cursor: pointer;
+        font-size: 20px;
+        line-height: 34px;
+      }
 
-.modal__content{ padding: 18px; }
+      .modal__content{ padding: 18px; }
 
-.nft{
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 18px;
-}
+      .nft{
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 18px;
+      }
 
-@media (max-width: 760px){
-  .nft{ grid-template-columns: 1fr; }
-}
+      @media (max-width: 760px){
+        .nft{ grid-template-columns: 1fr; }
+      }
 
-.nft__media{
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #f9fafb;
-  aspect-ratio: 1 / 1;
-  display: grid;
-  place-items: center;
-}
+      .nft__media{
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #f9fafb;
+        aspect-ratio: 1 / 1;
+        display: grid;
+        place-items: center;
+      }
 
-.nft__media img{
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display:block;
-}
+      .nft__media img{
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display:block;
+      }
 
-.nft__placeholder{
-  color:#6b7280;
-  font-size:14px;
-}
+      .nft__placeholder{
+        color:#6b7280;
+        font-size:14px;
+      }
 
-.nft__title{
-  font-size: 18px;
-  font-weight: 700;
-  color:#111827;
-  margin-bottom: 6px;
-}
+      .nft__title{
+        font-size: 18px;
+        font-weight: 700;
+        color:#111827;
+        margin-bottom: 6px;
+      }
 
-.nft__desc{
-  color:#374151;
-  font-size:14px;
-  line-height: 1.45;
-  margin-bottom: 12px;
-  white-space: pre-wrap;
-}
+      .nft__desc{
+        color:#374151;
+        font-size:14px;
+        line-height: 1.45;
+        margin-bottom: 12px;
+        white-space: pre-wrap;
+      }
 
-.nft__meta{
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  margin-bottom: 12px;
-}
+      .nft__meta{
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        margin-bottom: 12px;
+      }
 
-.muted{ color:#6b7280; }
-.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .muted{ color:#6b7280; }
+      .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
-.nft__actions{ margin: 10px 0 14px; }
+      .nft__actions{ margin: 10px 0 14px; }
 
-.nft__traitsTitle{
-  font-weight: 700;
-  margin: 10px 0 8px;
-  color:#111827;
-}
+      .nft__traitsTitle{
+        font-weight: 700;
+        margin: 10px 0 8px;
+        color:#111827;
+      }
 
-.traits{
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
+      .traits{
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
 
-@media (max-width: 520px){
-  .traits{ grid-template-columns: 1fr; }
-}
+      @media (max-width: 520px){
+        .traits{ grid-template-columns: 1fr; }
+      }
 
-.trait{
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: #fff;
-}
+      .trait{
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: #fff;
+      }
 
-.trait__k{
-  font-size: 12px;
-  color:#6b7280;
-  margin-bottom: 3px;
-}
+      .trait__k{
+        font-size: 12px;
+        color:#6b7280;
+        margin-bottom: 3px;
+      }
 
-.trait__v{
-  font-size: 14px;
-  font-weight: 600;
-  color:#111827;
-}
+      .trait__v{
+        font-size: 14px;
+        font-weight: 600;
+        color:#111827;
+      }
     </style>
   </head>
   <body data-page-name="developer">
