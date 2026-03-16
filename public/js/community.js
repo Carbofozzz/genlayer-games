@@ -52,6 +52,8 @@ async function checkDiscordAuth() {
                 composeImage(json.user);
                 await sleep(3000);
                 panno();
+                await sleep(5000);
+                panno();
             } else {
                 if (pannel) pannel.classList.add("hidden");
                 if (note) note.textContent = 'You are not a member of the GenLayer community.';
