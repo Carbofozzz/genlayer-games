@@ -132,7 +132,7 @@ const S3_KEY = process.env.S3_KEY || "";
 const S3_SECRET = process.env.S3_SECRET || "";
 const QUIZ_KEY_RAW = process.env.QUIZ_KEY || "";
 const AVA_PREFIX = process.env.AVA_PREFIX || 'community';
-const AVA_MAX_USERS = 474; 
+const AVA_MAX_USERS = 4884; 
 const PANO_CENTER_IMAGE_KEYS = {
   64: process.env.PANO_CENTER_IMAGE_KEY_64 || 'img/panno-center-64.png',
   48: process.env.PANO_CENTER_IMAGE_KEY_48 || 'img/panno-center-48.png',

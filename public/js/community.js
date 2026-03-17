@@ -81,7 +81,7 @@ async function panno() {
         const json = await res.json();
         console.log("panno", json);
         if (progress) progress.innerHTML = 'Progress: ' + json.processedAvatars + ' of ' + json.maxUsers + ' places';
-        if (nft && json.panorama) nft.src = json.panorama.url;
+        if (nft && json.panorama) nft.src = json.panorama.url+ '?t=' + Date.now();
     } catch (error) {
         if (progress) progress.innerHTML = '';
         if (nft) nft.src = 'https://storage.yandexcloud.net/genlayer/community/panorama/latest.jpg';
